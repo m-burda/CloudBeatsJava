@@ -1,0 +1,172 @@
+package com.cloudbeats.services.externalMediaStorage;
+
+import com.cloudbeats.db.config.DropboxClientProperties;
+import com.cloudbeats.db.entities.AudioFileMetadata;
+import com.cloudbeats.db.entities.StoredFile;
+import com.cloudbeats.models.FileType;
+import com.cloudbeats.models.FolderEntry;
+import com.cloudbeats.models.Provider;
+import com.cloudbeats.repositories.ApplicationUserRepository;
+import com.cloudbeats.repositories.FileRepository;
+import com.cloudbeats.repositories.FolderRepository;
+import com.cloudbeats.repositories.MediaStorageAccountRepository;
+import com.cloudbeats.services.AudioProcessingService;
+import com.dropbox.core.DbxException;
+import com.dropbox.core.DbxRequestConfig;
+import com.dropbox.core.oauth.DbxCredential;
+import com.dropbox.core.v2.DbxClientV2;
+import com.dropbox.core.v2.files.FolderMetadata;
+import com.dropbox.core.v2.files.ListFolderResult;
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
+
+import java.io.*;
+import java.util.*;
+
+@Service
+public class DropboxStorageService extends ExternalMediaStorageService {
+    private final MediaStorageAccountRepository mediaStorageAccountRepository;
+    private final FileRepository fileRepository;
+    private final DropboxClientProperties clientProperties;
+    private final AudioProcessingService audioProcessingService;
+
+    public DropboxStorageService(
+            ApplicationUserRepository userRepository,
+            MediaStorageAccountRepository mediaStorageAccountRepository,
+            FolderRepository folderRepository, FileRepository fileRepository,
+            DropboxClientProperties clientProperties, AudioProcessingService audioProcessingService
+    ) {
+        super(userRepository, folderRepository, fileRepository);
+        this.mediaStorageAccountRepository = mediaStorageAccountRepository;
+        this.fileRepository = fileRepository;
+        this.clientProperties = clientProperties;
+        this.audioProcessingService = audioProcessingService;
+    }
+
+    @Transactional
+    private DbxClientV2 getDbxClient(UUID userId) {
+        var account = mediaStorageAccountRepository.findByUserIdAndProvider(userId, getProvider())
+                .orElseThrow(() -> new IllegalStateException("No Dropbox account found for user: " + userId));
+
+        var config = new DbxRequestConfig(clientProperties.getClientId());
+        var credential = new DbxCredential(
+                account.getAccessToken(),
+                account.getTokenExpiresAt().getTime(),
+                account.getRefreshToken(),
+                clientProperties.getClientId(),
+                clientProperties.getClientSecret()
+        );
+        if (credential.aboutToExpire()) {
+            try {
+                credential.refresh(config);
+                account.setAccessToken(credential.getAccessToken());
+                account.setRefreshToken(credential.getRefreshToken());
+                account.setTokenExpiresAt(new Date(credential.getExpiresAt()));
+                mediaStorageAccountRepository.save(account);
+            } catch (DbxException e) {
+                throw new RuntimeException("Failed to refresh Dropbox token", e);
+            }
+        }
+
+        return new DbxClientV2(config, credential);
+    }
+
+    @Override
+    public Provider getProvider() {
+        return Provider.dropbox;
+    }
+
+    @Override
+    public List<FolderEntry> listFiles(UUID userId, String externalUserId, String folderId) {
+        List<FolderEntry> cachedResult = getFolderContentsFromCache(userId, folderId);
+        if (!cachedResult.isEmpty()) {
+            return cachedResult;
+        }
+
+        DbxClientV2 client = getDbxClient(userId);
+
+        try {
+            // Dropbox uses "" for the root folder instead of "/"
+            String path = folderId.equals("/") ? "" : folderId;
+
+            ListFolderResult folderData = client.files()
+                    .listFolderBuilder(path)
+                    .withIncludeMediaInfo(true)
+                    .start();
+
+            List<FolderEntry> entries = folderData.getEntries().stream().map(
+                    entry -> {
+                        var fileType = entry instanceof FolderMetadata ? FileType.FOLDER : FileType.AUDIO;
+                        return new FolderEntry(
+                                entry.getPreviewUrl(),
+                                fileType,
+                                entry.getName(),
+                                entry.getPathLower(),
+                                entry.getPathLower(),
+                                null,
+                                List.of(),
+                                List.of()
+                        );
+                    }
+            ).toList();
+
+            updateFolderContents(userId, folderId, entries);
+
+            return entries;
+
+        } catch (DbxException e) {
+            throw new IllegalArgumentException("Failed to list Dropbox files: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public AudioFileMetadata getOrUpdateAudioMetadata(UUID userId, String fileId) {
+        Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
+
+        if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
+            AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
+            // refreshPreviewUrlIfNeeded(user.getId(), fileId, cachedMetadata);
+            return cachedMetadata;
+        }
+
+        DbxClientV2 client = getDbxClient(userId);
+
+        try {
+            File tempFile = File.createTempFile("cloudbeats_", ".tmp");
+
+            try (OutputStream out = new FileOutputStream(tempFile)) {
+                client.files().download(fileId).download(out);
+            }
+
+            String extension = getExtensionFromMime(tempFile);
+            File renamedFile = new File(tempFile.getAbsolutePath() + extension);
+            if (tempFile.renameTo(renamedFile)) {
+                tempFile = renamedFile;
+            }
+
+            AudioFileMetadata extracted = audioProcessingService.extractAudioMetadata(tempFile);
+
+            // TODO extract this to a separate method. Better to cache separately
+            if (isPreviewUrlExpired(extracted)){
+                String previewUrl = getFilePreviewUrl(userId, fileId);
+                extracted.setPreviewUrl(previewUrl);
+            }
+
+            updateFileMetadata(userId, fileId, extracted);
+
+            return extracted;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Metadata extraction failed", e);
+        }
+    }
+
+    @Override
+    protected String getFilePreviewUrl(UUID userId, String fileId) {
+        try {
+            return getDbxClient(userId).files().getTemporaryLink(fileId).getLink();
+        } catch (DbxException e) {
+            throw new RuntimeException("Failed to refresh Dropbox preview URL", e);
+        }
+    }
+}

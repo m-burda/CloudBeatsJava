@@ -1,0 +1,105 @@
+spring:
+  application:
+    name: CloudBeats
+
+  config:
+    import: optional:file:.env.dev[.properties]
+
+  security:
+    user:
+      name: admin
+      password: admin
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+            scope:
+              - https://www.googleapis.com/auth/drive.readonly # For Google Drive
+              - email
+              - profile
+          dropbox:
+            client-id: ${DROPBOX_CLIENT_ID}
+            client-secret: ${DROPBOX_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/dropbox"
+            authorization-grant-type: authorization_code
+            authorization-uri: https://www.dropbox.com/oauth2/authorize?token_access_type=offline
+            scope:
+              - files.metadata.read
+              - files.content.read
+              - account_info.read
+          onedrive:
+            client-id: ${ONEDRIVE_CLIENT_ID}
+            client-secret: ${ONEDRIVE_CLIENT_SECRET}
+            tenant-id: consumers
+            redirect-uri: "{baseUrl}/login/oauth2/code/onedrive"
+            authorization-grant-type: authorization_code
+            scope:
+              - Files.Read
+              - Files.Read.All
+              - User.Read
+              - offline_access
+        provider:
+          dropbox:
+            authorization-uri: https://www.dropbox.com/oauth2/authorize?token_access_type=offline
+            token-uri: https://api.dropboxapi.com/oauth2/token
+            user-info-uri: https://api.dropboxapi.com/2/users/get_current_account
+            user-name-attribute: account_id
+          onedrive:
+            authorization-uri: https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/consumers/oauth2/v2.0/token
+            user-info-uri: https://graph.microsoft.com/v1.0/me
+            user-name-attribute: displayName
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/cloudbeats
+    username: efortls
+    password: pass1234
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+h2:
+  console:
+    enabled: true
+    path: /h2-console
+    settings:
+      web-allow-others: true
+
+server:
+  servlet:
+    session:
+      timeout: 1h
+      cookie:
+        domain: localhost
+        max-age: 86400
+        path: /
+        http-only: true
+        secure: false
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+  hibernate:
+    type:
+      descriptor:
+        sql:
+          BasicBinder: TRACE
+
+jwt:
+  secret: mysecretkey
+  expiration: 3600000
+  issuer: cloudbeats
+
+cloudbeats:
+  storage:
+    artwork: ./artworks
