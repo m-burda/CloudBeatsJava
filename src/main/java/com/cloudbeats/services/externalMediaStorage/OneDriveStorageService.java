@@ -124,25 +124,23 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
         GraphServiceClient graphClient = getGraphClient(userId);
         String driveId = "me";
 
-        List<DriveItem> items;
-        if (folderId == null || folderId.isEmpty() || folderId.equals("/")) {
-            // Use $expand=children on root to get root children
-            DriveItem root = graphClient.drives().byDriveId(driveId).root().get(config -> {
-                config.queryParameters.expand = new String[]{"children"};
-            });
-            items = root.getChildren() != null ? root.getChildren() : List.of();
-        } else {
-            // For a subfolder, request the item with $expand=children
-            DriveItem folder = graphClient.drives().byDriveId(driveId).root()
-                    .withUrl("https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + folderId)
-                    .get(config -> {
-                        config.queryParameters.expand = new String[]{"children"};
-                    });
-            items = folder.getChildren() != null ? folder.getChildren() : List.of();
-        }
+        var childrenResponse = graphClient.drives().byDriveId("me").items().byDriveItemId("root").children().get(config -> {
+            config.queryParameters.select = new String[]{"id", "name", "folder", "audio", "file"};
+        });
 
+        List<DriveItem> items = childrenResponse != null && childrenResponse.getValue() != null
+                ? childrenResponse.getValue()
+                : List.of();
+
+        // Filter directly by mimeType because dogwater OneDrive won't generate metadata
         List<FolderEntry> entries = items.stream()
-                .filter(item -> item.getName() != null)
+                .filter(item ->
+                        item.getName() != null
+                                && (item.getFolder() != null
+                                || (item.getFile() != null
+                                && Objects.equals(item.getFile().getMimeType(), "audio/mpeg")
+                        ))
+                )
                 .map(item -> {
                     FileType fileType = item.getFolder() != null ? FileType.FOLDER : FileType.AUDIO;
                     return new FolderEntry(
@@ -158,7 +156,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 })
                 .collect(Collectors.toList());
 
-        updateFolderContents(userId, folderId, entries);
+//        updateFolderContents(userId, folderId, entries);
 
         return entries;
     }
