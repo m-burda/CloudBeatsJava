@@ -1,19 +1,15 @@
 package com.cloudbeats.db.entities;
 
 import com.cloudbeats.models.AudioCodec;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Transient;
+import jakarta.persistence.*;
 import java.util.List;
 
 @Entity
 public class AudioFileMetadata extends FileMetadata {
     private String title;
-    @ElementCollection
-    private List<String> albumArtists;
+    @ManyToMany
+    private List<Artist> albumArtists;
     private String albumCoverUrl;
-    @ElementCollection
-    private List<String> performers;
     private String album;
     @ElementCollection
     private List<String> genres;
@@ -24,7 +20,6 @@ public class AudioFileMetadata extends FileMetadata {
 
     private double duration;
 
-    // Getters and setters
     public String getTitle() {
         return title;
     }
@@ -33,11 +28,11 @@ public class AudioFileMetadata extends FileMetadata {
         this.title = title;
     }
 
-    public List<String> getAlbumArtists() {
+    public List<Artist> getAlbumArtists() {
         return albumArtists;
     }
 
-    public void setAlbumArtists(List<String> albumArtists) {
+    public void setAlbumArtists(List<Artist> albumArtists) {
         this.albumArtists = albumArtists;
     }
 
@@ -47,14 +42,6 @@ public class AudioFileMetadata extends FileMetadata {
 
     public void setAlbumCoverUrl(String albumCoverUrl) {
         this.albumCoverUrl = albumCoverUrl;
-    }
-
-    public List<String> getPerformers() {
-        return performers;
-    }
-
-    public void setPerformers(List<String> performers) {
-        this.performers = performers;
     }
 
     public String getAlbum() {

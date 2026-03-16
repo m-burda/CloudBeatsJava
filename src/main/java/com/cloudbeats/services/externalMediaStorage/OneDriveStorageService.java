@@ -174,7 +174,6 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
 
             GraphServiceClient graphClient = getGraphClient(userId);
 
-            // Use content().get() which returns InputStream directly
             InputStream fileStream = graphClient.drives().byDriveId("me").root()
                     .withUrl("https://graph.microsoft.com/v1.0/drives/me/items/" + fileId + "/content")
                     .content()

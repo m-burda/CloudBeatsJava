@@ -1,6 +1,8 @@
 package com.cloudbeats.services;
 
+import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.AudioFileMetadata;
+import com.cloudbeats.repositories.ArtistRepository;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.audio.AudioHeader;
@@ -25,12 +27,14 @@ import java.util.List;
 @Service
 public class LocalAudioProcessingService implements AudioProcessingService {
     private final FileManagementService fileManagementService;
+    private final ArtistRepository artistRepository;
 
     @Value("${cloudbeats.storage.artwork}")
     private Path artworkPath;
 
-    public LocalAudioProcessingService(FileManagementService fileManagementService) {
+    public LocalAudioProcessingService(FileManagementService fileManagementService, ArtistRepository artistRepository) {
         this.fileManagementService = fileManagementService;
+        this.artistRepository = artistRepository;
     }
 
     public AudioFileMetadata extractAudioMetadata(String originalFileName, File file){
@@ -43,14 +47,18 @@ public class LocalAudioProcessingService implements AudioProcessingService {
 
             if (tag == null) {
                 extracted.setTitle(originalFileName);
-                extracted.setAlbumArtists(List.of("Unknown Artist"));
+                Artist unknownArtist = getOrCreateArtist("Unknown Artist");
+                extracted.setAlbumArtists(List.of(unknownArtist));
                 extracted.setAlbum("Unknown");
                 return extracted;
             }
 
             extracted.setTitle(tag.getFirst(FieldKey.TITLE));
             extracted.setAlbum(tag.getFirst(FieldKey.ALBUM));
-            extracted.setAlbumArtists(List.of(tag.getFirst(FieldKey.ARTIST)));
+
+            String artistName = tag.getFirst(FieldKey.ARTIST);
+            Artist artist = getOrCreateArtist(artistName);
+            extracted.setAlbumArtists(List.of(artist));
 
             var artwork = tag.getFirstArtwork();
             if (artwork != null) {
@@ -71,6 +79,17 @@ public class LocalAudioProcessingService implements AudioProcessingService {
         } catch (InvalidAudioFrameException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private Artist getOrCreateArtist(String artistName) {
+        final String finalArtistName = (artistName == null || artistName.trim().isEmpty())
+                ? "Unknown Artist"
+                : artistName;
+        return artistRepository.findById(finalArtistName)
+                .orElseGet(() -> {
+                    Artist newArtist = new Artist(finalArtistName);
+                    return artistRepository.save(newArtist);
+                });
     }
 
     private String generateArtworkName(Artwork artwork) {
