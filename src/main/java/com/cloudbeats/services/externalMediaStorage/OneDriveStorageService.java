@@ -191,7 +191,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 tempFile = renamedFile;
             }
 
-            var metadata = audioProcessingService.extractAudioMetadata(tempFile);
+            var metadata = audioProcessingService.extractAudioMetadata(fileId, tempFile);
             metadata.setPreviewUrl(getFilePreviewUrl(userId, fileId));
             updateFileMetadata(userId, fileId, metadata);
 

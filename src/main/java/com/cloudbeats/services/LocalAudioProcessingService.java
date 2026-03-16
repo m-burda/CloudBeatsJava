@@ -33,13 +33,20 @@ public class LocalAudioProcessingService implements AudioProcessingService {
         this.fileManagementService = fileManagementService;
     }
 
-    public AudioFileMetadata extractAudioMetadata(File file){
+    public AudioFileMetadata extractAudioMetadata(String originalFileName, File file){
         try {
             AudioFile f = AudioFileIO.read(file);
             Tag tag = f.getTag();
             AudioHeader header = f.getAudioHeader();
 
             AudioFileMetadata extracted = new AudioFileMetadata();
+
+            if (tag == null) {
+                extracted.setTitle(originalFileName);
+                extracted.setAlbumArtists(List.of("Unknown Artist"));
+                extracted.setAlbum("Unknown");
+                return extracted;
+            }
 
             extracted.setTitle(tag.getFirst(FieldKey.TITLE));
             extracted.setAlbum(tag.getFirst(FieldKey.ALBUM));

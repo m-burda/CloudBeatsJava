@@ -125,7 +125,6 @@ public class DropboxStorageService extends ExternalMediaStorageService {
 
         if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
             AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
-            // refreshPreviewUrlIfNeeded(user.getId(), fileId, cachedMetadata);
             return cachedMetadata;
         }
 
@@ -144,7 +143,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 tempFile = renamedFile;
             }
 
-            AudioFileMetadata extracted = audioProcessingService.extractAudioMetadata(tempFile);
+            AudioFileMetadata extracted = audioProcessingService.extractAudioMetadata(fileId, tempFile);
 
             // TODO extract this to a separate method. Better to cache separately
             if (isPreviewUrlExpired(extracted)){
