@@ -152,20 +152,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
 
             updateFileMetadata(userId, fileId, metadata);
 
-            String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
-                    metadata.getAlbumCoverUrl(),
-                    Duration.ofDays(7)
-            );
-
-            return new AudioFileMetadataDto(
-                    metadata.getTitle(),
-                    metadata.getAlbumArtists().stream().map(Artist::getName).toList(),
-                    metadata.getAlbum(),
-                    metadata.getGenres(),
-                    albumCoverUrl,
-                    metadata.getDuration(),
-                    metadata.getPreviewUrl()
-            );
+            return toAudioFileMetadataDto(metadata);
 
         } catch (Exception e) {
             throw new RuntimeException("Metadata extraction failed", e);

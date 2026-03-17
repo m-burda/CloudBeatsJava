@@ -1,6 +1,5 @@
 package com.cloudbeats.services;
 
-import com.cloudbeats.db.entities.AudioFileMetadata;
 import com.cloudbeats.repositories.ArtistRepository;
 import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.dto.ArtistDto;
@@ -8,8 +7,8 @@ import com.cloudbeats.db.entities.StoredFile;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ArtistService {
@@ -26,13 +25,13 @@ public class ArtistService {
         this.fileManagementService = fileManagementService;
     }
 
-    public List<ArtistDto> getArtistsByUserId(String userId) {
+    public List<ArtistDto> getAllArtists(String userId) {
         // TODO n+1
         var user = applicationUserService.findApplicationUserByUsername(userId);
         return artistRepository.findByUserId(user.getId()).stream()
                 .map(artist -> {
                     // Find the first stored file with metadata containing this artist
-                    var files = fileRepository.findByOwnerId(user.getId());
+                    var files = fileRepository.findByOwnerIdOrderByName(user.getId());
                     String albumCoverUrl = files.stream()
                             .filter(file -> file.getMetadataJson() != null
                                     && file.getMetadataJson().getAlbumArtists() != null
@@ -48,6 +47,7 @@ public class ArtistService {
 
                     return new ArtistDto(artist.getName(), albumCoverUrl);
                 })
+                .sorted(Comparator.comparing(ArtistDto::getName))
                 .toList();
     }
 }

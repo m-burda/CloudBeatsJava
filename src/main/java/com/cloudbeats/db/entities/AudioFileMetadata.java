@@ -9,6 +9,7 @@ public class AudioFileMetadata extends FileMetadata {
     private String title;
     @ManyToMany
     private List<Artist> albumArtists;
+    @Deprecated
     private String albumCoverUrl;
     private String album;
     @ElementCollection

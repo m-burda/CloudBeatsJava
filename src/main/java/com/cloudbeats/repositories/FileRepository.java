@@ -9,5 +9,5 @@ import java.util.UUID;
 
 public interface FileRepository extends CrudRepository<StoredFile, UUID> {
     Optional<StoredFile> findByOwnerIdAndExternalId(UUID ownerId, String externalId);
-    List<StoredFile> findByOwnerId(UUID ownerId);
+    List<StoredFile> findByOwnerIdOrderByName(UUID ownerId);
 }

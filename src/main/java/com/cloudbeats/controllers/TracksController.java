@@ -1,21 +1,34 @@
 package com.cloudbeats.controllers;
 
-import com.cloudbeats.db.entities.Track;
+import com.cloudbeats.db.entities.ApplicationUser;
+import com.cloudbeats.dto.Song;
+import com.cloudbeats.models.FolderEntry;
+import com.cloudbeats.services.ApplicationUserService;
+import com.cloudbeats.services.SongService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
-@RequestMapping("/api/tracks")
-public class TracksController {
+import java.util.List;
 
-    @GetMapping("/all")
-    public String getAllTracks() {
-        // Implement logic to retrieve all tracks using Track entity
-        return "List of all tracks";
+@RestController
+@RequestMapping("/api/songs")
+public class TracksController {
+    private final SongService songService;
+    private final ApplicationUserService userService;
+
+    public TracksController(SongService songService, ApplicationUserService userService) {
+        this.songService = songService;
+        this.userService = userService;
     }
 
-    @PostMapping("/add")
-    public String addTrack(@RequestBody Track track) {
-        // Implement logic to add a new track using Track entity
-        return "Track added: " + track.getTitle();
+    @GetMapping
+    public ResponseEntity<List<Song>> getAllSongs(
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
+        List<Song> songs = songService.getAllSongs(user.getId());
+        return ResponseEntity.ok(songs);
     }
 }

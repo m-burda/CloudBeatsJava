@@ -52,23 +52,7 @@ public abstract class ExternalMediaStorageService {
 
         if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
             AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
-
-            // Generate access URL for album cover if expired (don't modify the entity)
-            String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
-                    cachedMetadata.getAlbumCoverUrl(),
-                    Duration.ofDays(7)
-            );
-
-            AudioFileMetadataDto response = new AudioFileMetadataDto(
-                    cachedMetadata.getTitle(),
-                    cachedMetadata.getAlbumArtists().stream().map(Artist::getName).toList(),
-                    cachedMetadata.getAlbum(),
-                    cachedMetadata.getGenres(),
-                    albumCoverUrl,
-                    cachedMetadata.getDuration(),
-                    cachedMetadata.getPreviewUrl()
-            );
-
+            AudioFileMetadataDto response = toAudioFileMetadataDto(cachedMetadata);
             return Optional.of(response);
         }
         return Optional.empty();
@@ -198,7 +182,7 @@ public abstract class ExternalMediaStorageService {
             if (entry.type() == FileType.FOLDER) {
                 var folder = new StoredFolder();
                 folder.setExternalId(entry.path());
-                folder.setProvider(Provider.dropbox);
+                folder.setProvider(getProvider());
                 folder.setOwner(currentUser);
                 folder.setName(entry.name());
                 folder.setParent(parentFolder);
@@ -207,7 +191,7 @@ public abstract class ExternalMediaStorageService {
             } else if (entry.type() == FileType.AUDIO) {
                 var file = new StoredFile();
                 file.setExternalId(entry.path());
-                file.setProvider(Provider.dropbox);
+                file.setProvider(getProvider());
                 file.setOwner(currentUser);
                 file.setName(entry.name());
                 file.setFolder(parentFolder);
@@ -219,5 +203,22 @@ public abstract class ExternalMediaStorageService {
         }
 
         folderRepository.save(parentFolder);
+    }
+
+    protected AudioFileMetadataDto toAudioFileMetadataDto(AudioFileMetadata metadata) {
+        String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
+                metadata.getAlbumCoverUrl(),
+                Duration.ofDays(7)
+        );
+
+        return new AudioFileMetadataDto(
+                metadata.getTitle(),
+                metadata.getAlbumArtists().stream().map(Artist::getName).toList(),
+                metadata.getAlbum(),
+                metadata.getGenres(),
+                albumCoverUrl,
+                metadata.getDuration(),
+                metadata.getPreviewUrl()
+        );
     }
 }

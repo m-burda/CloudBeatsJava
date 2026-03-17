@@ -22,11 +22,10 @@ import java.util.Optional;
 @Profile("dev")
 public class S3FileManagementService implements FileManagementService {
     private final S3Client client;
-    private final S3Presigner presigner;
+    private static final S3Presigner presigner = S3Presigner.builder().build();
 
     public S3FileManagementService(S3Client s3Client) {
         this.client = s3Client;
-        this.presigner = S3Presigner.builder().build();
     }
 
     public String writeData(byte[] data, Path path) {
@@ -59,14 +58,19 @@ public class S3FileManagementService implements FileManagementService {
     @Override
     public String generateAccessUrlIfExpired(String internalUri, Duration duration) {
         if (internalUri == null || internalUri.isEmpty()) {
-            return null;
+            return internalUri;
         }
 
         // TODO check for expiration
 
+        URI uri = URI.create(internalUri);
+        if (!uri.getScheme().equals("s3")) {
+            return internalUri;
+        }
+
         try {
             S3Utilities s3Utilities = S3Utilities.builder().region(S3Config.REGION).build();
-            S3Uri parsedUri = s3Utilities.parseUri(URI.create(internalUri));
+            S3Uri parsedUri = s3Utilities.parseUri(uri);
             Optional<String> key = parsedUri.key();
 
             if (key.isEmpty()) {
