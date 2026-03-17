@@ -1,10 +1,10 @@
 package com.cloudbeats.services.externalMediaStorage;
 
 import com.cloudbeats.db.config.DropboxClientProperties;
-import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.dto.AudioFileMetadataDto;
-import com.cloudbeats.models.FileType;
-import com.cloudbeats.models.FolderEntry;
+import com.cloudbeats.dto.FolderContentsDto;
+import com.cloudbeats.dto.FolderDto;
+import com.cloudbeats.dto.Song;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.*;
 import com.cloudbeats.services.AudioProcessingService;
@@ -19,7 +19,6 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
-import java.time.Duration;
 import java.util.*;
 
 @Service
@@ -77,9 +76,9 @@ public class DropboxStorageService extends ExternalMediaStorageService {
     }
 
     @Override
-    public List<FolderEntry> listFiles(UUID userId, String externalUserId, String folderId) {
-        List<FolderEntry> cachedResult = getFolderContentsFromCache(userId, folderId);
-        if (!cachedResult.isEmpty()) {
+    public FolderContentsDto listFiles(UUID userId, String externalUserId, String folderId) {
+        FolderContentsDto cachedResult = getFolderContentsFromCache(userId, folderId);
+        if (cachedResult != null) {
             return cachedResult;
         }
 
@@ -94,26 +93,21 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                     .withIncludeMediaInfo(true)
                     .start();
 
-            List<FolderEntry> entries = folderData.getEntries().stream().map(
-                    entry -> {
-                        var fileType = entry instanceof FolderMetadata ? FileType.FOLDER : FileType.AUDIO;
-                        return new FolderEntry(
-                                entry.getPreviewUrl(),
-                                fileType,
-                                entry.getName(),
-                                getProvider(),
-                                entry.getPathLower(),
-                                entry.getPathLower(),
-                                null,
-                                List.of(),
-                                List.of()
-                        );
-                    }
-            ).toList();
+            List<FolderDto> folders = new ArrayList<>();
+            List<Song> songs = new ArrayList<>();
 
-            updateFolderContents(userId, folderId, entries);
+            folderData.getEntries().forEach(entry -> {
+                if (entry instanceof FolderMetadata) {
+                    folders.add(new FolderDto(entry.getName(), getProvider(), entry.getPathLower(), entry.getPathLower()));
+                } else {
+                    songs.add(new Song(entry.getName(), List.of(), getProvider(), entry.getPathLower(), entry.getPathLower(), entry.getPreviewUrl(), null, null));
+                }
+            });
 
-            return entries;
+            FolderContentsDto contents = new FolderContentsDto(folders, songs);
+            updateFolderContents(userId, folderId, contents);
+
+            return contents;
 
         } catch (DbxException e) {
             throw new IllegalArgumentException("Failed to list Dropbox files: " + e.getMessage());

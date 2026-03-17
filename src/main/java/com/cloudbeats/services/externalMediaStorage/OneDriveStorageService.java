@@ -5,11 +5,11 @@ import com.azure.core.credential.TokenCredential;
 import com.azure.identity.ClientSecretCredential;
 import com.azure.identity.ClientSecretCredentialBuilder;
 import com.cloudbeats.db.config.OneDriveClientProperties;
-import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.MediaStorageAccount;
 import com.cloudbeats.dto.AudioFileMetadataDto;
-import com.cloudbeats.models.FileType;
-import com.cloudbeats.models.FolderEntry;
+import com.cloudbeats.dto.FolderContentsDto;
+import com.cloudbeats.dto.FolderDto;
+import com.cloudbeats.dto.Song;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
 import com.cloudbeats.repositories.ArtistRepository;
@@ -29,11 +29,9 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class OneDriveStorageService extends ExternalMediaStorageService {
@@ -120,14 +118,13 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
 
     @Override
     @Transactional
-    public List<FolderEntry> listFiles(UUID userId, String externalUserId, String folderId) {
-        List<FolderEntry> cachedResult = getFolderContentsFromCache(userId, folderId);
-        if (!cachedResult.isEmpty()) {
+    public FolderContentsDto listFiles(UUID userId, String externalUserId, String folderId) {
+        FolderContentsDto cachedResult = getFolderContentsFromCache(userId, folderId);
+        if (cachedResult != null) {
             return cachedResult;
         }
 
         GraphServiceClient graphClient = getGraphClient(userId);
-        String driveId = "me";
 
         var childrenResponse = graphClient.drives().byDriveId("me").items().byDriveItemId("root").children().get(config -> {
             config.queryParameters.select = new String[]{"id", "name", "folder", "audio", "file"};
@@ -137,8 +134,11 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 ? childrenResponse.getValue()
                 : List.of();
 
+        List<FolderDto> folders = new ArrayList<>();
+        List<Song> songs = new ArrayList<>();
+
         // Filter directly by mimeType because dogwater OneDrive won't generate metadata
-        List<FolderEntry> entries = items.stream()
+        items.stream()
                 .filter(item ->
                         item.getName() != null
                                 && (item.getFolder() != null
@@ -146,25 +146,18 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                                 && Objects.equals(item.getFile().getMimeType(), "audio/mpeg")
                         ))
                 )
-                .map(item -> {
-                    FileType fileType = item.getFolder() != null ? FileType.FOLDER : FileType.AUDIO;
-                    return new FolderEntry(
-                            null,
-                            fileType,
-                            item.getName(),
-                            getProvider(),
-                            item.getId(),
-                            item.getId(),
-                            null,
-                            List.of(),
-                            List.of()
-                    );
-                })
-                .collect(Collectors.toList());
+                .forEach(item -> {
+                    if (item.getFolder() != null) {
+                        folders.add(new FolderDto(item.getName(), getProvider(), item.getId(), item.getId()));
+                    } else {
+                        songs.add(new Song(item.getName(), List.of(), getProvider(), item.getId(), item.getId(), null, null, null));
+                    }
+                });
 
-        updateFolderContents(userId, folderId, entries);
+        FolderContentsDto contents = new FolderContentsDto(folders, songs);
+        updateFolderContents(userId, folderId, contents);
 
-        return entries;
+        return contents;
     }
 
     @Override

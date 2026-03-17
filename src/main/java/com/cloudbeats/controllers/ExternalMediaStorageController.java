@@ -3,8 +3,8 @@ package com.cloudbeats.controllers;
 import com.cloudbeats.db.entities.ApplicationUser;
 import com.cloudbeats.db.entities.MediaStorageAccount;
 import com.cloudbeats.dto.AudioFileMetadataDto;
+import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.factories.ExternalMediaStorageServiceFactory;
-import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.services.ApplicationUserService;
 import com.cloudbeats.services.externalMediaStorage.ExternalMediaStorageService;
@@ -15,7 +15,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/account/external")
@@ -29,7 +28,7 @@ public class ExternalMediaStorageController {
     }
 
     @GetMapping("/{provider}/files/list")
-    public ResponseEntity<List<FolderEntry>> listFiles(
+    public ResponseEntity<FolderContentsDto> listFiles(
         @PathVariable Provider provider,
         @RequestParam(defaultValue = "") String path,
         @AuthenticationPrincipal UserDetails principal
@@ -43,13 +42,13 @@ public class ExternalMediaStorageController {
 
         ExternalMediaStorageService storageService = storageFactory.getService(provider);
 
-        List<FolderEntry> files = storageService.listFiles(
+        FolderContentsDto contents = storageService.listFiles(
                 user.getId(),
                 externalAccount.getAccountUserId(),
                 path
         );
 
-        return ResponseEntity.ok(files);
+        return ResponseEntity.ok(contents);
     }
 
     private record GetMetadataFileRequest(
