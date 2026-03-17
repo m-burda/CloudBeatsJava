@@ -6,6 +6,8 @@ import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.dto.ArtistDto;
 import com.cloudbeats.db.entities.StoredFile;
 import org.springframework.stereotype.Service;
+
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,11 +17,13 @@ public class ArtistService {
     private final ArtistRepository artistRepository;
     private final FileRepository fileRepository;
     private final ApplicationUserService applicationUserService;
+    private final FileManagementService fileManagementService;
 
-    public ArtistService(ArtistRepository artistRepository, FileRepository fileRepository, ApplicationUserService applicationUserService) {
+    public ArtistService(ArtistRepository artistRepository, FileRepository fileRepository, ApplicationUserService applicationUserService, FileManagementService fileManagementService) {
         this.artistRepository = artistRepository;
         this.fileRepository = fileRepository;
         this.applicationUserService = applicationUserService;
+        this.fileManagementService = fileManagementService;
     }
 
     public List<ArtistDto> getArtistsByUserId(String userId) {
@@ -36,7 +40,10 @@ public class ArtistService {
                                     .anyMatch(a -> a.getName().equals(artist.getName())))
                             .findFirst()
                             .map(StoredFile::getMetadataJson)
-                            .map(AudioFileMetadata::getAlbumCoverUrl)
+                            .map(f -> fileManagementService.generateAccessUrlIfExpired(
+                                    f.getAlbumCoverUrl(),
+                                    Duration.ofDays(7)
+                            ))
                             .orElse(null);
 
                     return new ArtistDto(artist.getName(), albumCoverUrl);

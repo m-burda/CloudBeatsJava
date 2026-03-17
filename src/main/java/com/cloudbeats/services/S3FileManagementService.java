@@ -62,6 +62,8 @@ public class S3FileManagementService implements FileManagementService {
             return null;
         }
 
+        // TODO check for expiration
+
         try {
             S3Utilities s3Utilities = S3Utilities.builder().region(S3Config.REGION).build();
             S3Uri parsedUri = s3Utilities.parseUri(URI.create(internalUri));
