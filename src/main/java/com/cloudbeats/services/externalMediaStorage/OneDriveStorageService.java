@@ -5,9 +5,9 @@ import com.azure.core.credential.TokenCredential;
 import com.azure.identity.ClientSecretCredential;
 import com.azure.identity.ClientSecretCredentialBuilder;
 import com.cloudbeats.db.config.OneDriveClientProperties;
-import com.cloudbeats.db.entities.AudioFileMetadata;
+import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.MediaStorageAccount;
-import com.cloudbeats.db.entities.StoredFile;
+import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -166,12 +167,11 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
     }
 
     @Override
-    public AudioFileMetadata getOrUpdateAudioMetadata(UUID userId, String fileId) {
+    public AudioFileMetadataDto getOrUpdateAudioMetadata(UUID userId, String fileId) {
         try {
-            Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
-
-            if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
-                return cachedFile.get().getMetadataJson();
+            Optional<AudioFileMetadataDto> optionalCachedMetadata = getMetadataFromCache(userId, fileId);
+            if (optionalCachedMetadata.isPresent()) {
+                return optionalCachedMetadata.get();
             }
 
             GraphServiceClient graphClient = getGraphClient(userId);
@@ -197,7 +197,20 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             metadata.setPreviewUrl(getFilePreviewUrl(userId, fileId));
             updateFileMetadata(userId, fileId, metadata);
 
-            return metadata;
+            String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
+                    metadata.getAlbumCoverUrl(),
+                    Duration.ofDays(7)
+            );
+
+            return new AudioFileMetadataDto(
+                    metadata.getTitle(),
+                    metadata.getAlbumArtists().stream().map(Artist::getName).toList(),
+                    metadata.getAlbum(),
+                    metadata.getGenres(),
+                    albumCoverUrl,
+                    metadata.getDuration(),
+                    metadata.getPreviewUrl()
+            );
         } catch (Exception e) {
             throw new RuntimeException("Metadata extraction failed for OneDrive file", e);
         }

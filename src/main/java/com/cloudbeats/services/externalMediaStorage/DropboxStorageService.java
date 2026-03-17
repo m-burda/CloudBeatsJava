@@ -1,8 +1,8 @@
 package com.cloudbeats.services.externalMediaStorage;
 
 import com.cloudbeats.db.config.DropboxClientProperties;
-import com.cloudbeats.db.entities.AudioFileMetadata;
-import com.cloudbeats.db.entities.StoredFile;
+import com.cloudbeats.db.entities.Artist;
+import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
@@ -19,6 +19,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.time.Duration;
 import java.util.*;
 
 @Service
@@ -119,12 +120,10 @@ public class DropboxStorageService extends ExternalMediaStorageService {
     }
 
     @Override
-    public AudioFileMetadata getOrUpdateAudioMetadata(UUID userId, String fileId) {
-        Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
-
-        if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
-            AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
-            return cachedMetadata;
+    public AudioFileMetadataDto getOrUpdateAudioMetadata(UUID userId, String fileId) {
+        Optional<AudioFileMetadataDto> optionalCachedMetadata = getMetadataFromCache(userId, fileId);
+        if (optionalCachedMetadata.isPresent()) {
+            return optionalCachedMetadata.get();
         }
 
         DbxClientV2 client = getDbxClient(userId);
@@ -153,7 +152,20 @@ public class DropboxStorageService extends ExternalMediaStorageService {
 
             updateFileMetadata(userId, fileId, metadata);
 
-            return metadata;
+            String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
+                    metadata.getAlbumCoverUrl(),
+                    Duration.ofDays(7)
+            );
+
+            return new AudioFileMetadataDto(
+                    metadata.getTitle(),
+                    metadata.getAlbumArtists().stream().map(Artist::getName).toList(),
+                    metadata.getAlbum(),
+                    metadata.getGenres(),
+                    albumCoverUrl,
+                    metadata.getDuration(),
+                    metadata.getPreviewUrl()
+            );
 
         } catch (Exception e) {
             throw new RuntimeException("Metadata extraction failed", e);

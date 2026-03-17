@@ -2,7 +2,7 @@ package com.cloudbeats.dto;
 
 import java.util.List;
 
-public record GetAudioFileMetadataResponse(
+public record AudioFileMetadataDto(
         String title,
         List<String> albumArtists,
         String album,

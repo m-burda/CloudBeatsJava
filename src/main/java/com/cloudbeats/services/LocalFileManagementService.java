@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 
 @Service
 @Profile("!dev")
@@ -33,5 +34,10 @@ public class LocalFileManagementService implements FileManagementService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to save artwork", e);
         }
+    }
+
+    @Override
+    public String generateAccessUrlIfExpired(String internalUri, Duration duration) {
+        return internalUri;
     }
 }

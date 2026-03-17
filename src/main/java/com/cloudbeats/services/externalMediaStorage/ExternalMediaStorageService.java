@@ -6,6 +6,7 @@ import com.cloudbeats.db.entities.AudioFileMetadata;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.db.entities.StoredFolder;
 import com.cloudbeats.dto.AudioMetadataExtractionDto;
+import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
@@ -22,10 +23,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public abstract class ExternalMediaStorageService {
@@ -46,8 +44,35 @@ public abstract class ExternalMediaStorageService {
 
     public abstract Provider getProvider();
     public abstract List<FolderEntry> listFiles(UUID userId, String externalUserId, String folderId);
-    public abstract AudioFileMetadata getOrUpdateAudioMetadata(UUID userId, String fileId);
+    public abstract AudioFileMetadataDto getOrUpdateAudioMetadata(UUID userId, String fileId);
     protected abstract String getFilePreviewUrl(UUID userId, String fileId);
+
+    protected Optional<AudioFileMetadataDto> getMetadataFromCache(UUID userId, String fileId) {
+        Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
+
+        if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
+            AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
+
+            // Generate access URL for album cover if expired (don't modify the entity)
+            String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
+                    cachedMetadata.getAlbumCoverUrl(),
+                    Duration.ofDays(7)
+            );
+
+            AudioFileMetadataDto response = new AudioFileMetadataDto(
+                    cachedMetadata.getTitle(),
+                    cachedMetadata.getAlbumArtists().stream().map(Artist::getName).toList(),
+                    cachedMetadata.getAlbum(),
+                    cachedMetadata.getGenres(),
+                    albumCoverUrl,
+                    cachedMetadata.getDuration(),
+                    cachedMetadata.getPreviewUrl()
+            );
+
+            return Optional.of(response);
+        }
+        return Optional.empty();
+    }
 
     @Transactional
     public void updateFileMetadata(UUID userId, String fileId, AudioFileMetadata metadata) {

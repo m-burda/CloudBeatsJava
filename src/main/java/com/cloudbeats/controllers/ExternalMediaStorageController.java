@@ -1,9 +1,8 @@
 package com.cloudbeats.controllers;
 
 import com.cloudbeats.db.entities.ApplicationUser;
-import com.cloudbeats.db.entities.AudioFileMetadata;
 import com.cloudbeats.db.entities.MediaStorageAccount;
-import com.cloudbeats.dto.GetAudioFileMetadataResponse;
+import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.factories.ExternalMediaStorageServiceFactory;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
@@ -58,7 +57,7 @@ public class ExternalMediaStorageController {
     ){}
 
     @PostMapping("/{provider}/files")
-    public ResponseEntity<GetAudioFileMetadataResponse> getFileMetadata(
+    public ResponseEntity<AudioFileMetadataDto> getFileMetadata(
             @PathVariable Provider provider,
             @RequestBody GetMetadataFileRequest requestData,
             @AuthenticationPrincipal UserDetails principal
@@ -66,19 +65,9 @@ public class ExternalMediaStorageController {
         ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
 
         ExternalMediaStorageService storageService = storageFactory.getService(provider);
-        AudioFileMetadata metadata = storageService.getOrUpdateAudioMetadata(user.getId(), requestData.Path);
+        AudioFileMetadataDto metadata = storageService.getOrUpdateAudioMetadata(user.getId(), requestData.Path);
 
-        GetAudioFileMetadataResponse response = new GetAudioFileMetadataResponse(
-                metadata.getTitle(),
-                metadata.getAlbumArtists().stream().map(artist -> artist.getName()).toList(),
-                metadata.getAlbum(),
-                metadata.getGenres(),
-                metadata.getAlbumCoverUrl(),
-                metadata.getDuration(),
-                metadata.getPreviewUrl()
-        );
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(metadata);
     }
 
 
