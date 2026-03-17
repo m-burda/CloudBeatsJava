@@ -45,8 +45,11 @@ public abstract class ExternalMediaStorageService {
     }
 
     public abstract Provider getProvider();
+
     public abstract FolderContentsDto listFiles(UUID userId, String externalUserId, String folderId);
+
     public abstract AudioFileMetadataDto getOrUpdateAudioMetadata(UUID userId, String fileId);
+
     protected abstract String getFilePreviewUrl(UUID userId, String fileId);
 
     protected Optional<AudioFileMetadataDto> getMetadataFromCache(UUID userId, String fileId) {
@@ -57,7 +60,7 @@ public abstract class ExternalMediaStorageService {
             AudioFileMetadataDto response = toAudioFileMetadataDto(cachedMetadata);
 
             // TODO side effect
-            if (isPreviewUrlExpired(cachedMetadata)){
+            if (isPreviewUrlExpired(cachedMetadata)) {
                 String previewUrl = getFilePreviewUrl(userId, fileId);
                 cachedMetadata.setPreviewUrl(previewUrl);
                 updateFileMetadata(userId, fileId, cachedMetadata);
@@ -102,14 +105,19 @@ public abstract class ExternalMediaStorageService {
 
     @Transactional
     public FolderContentsDto getFolderContentsFromCache(UUID userId, String folderId) {
-        var folder = folderRepository.findByProviderAndExternalId(getProvider(), folderId);
+        var folder = folderRepository.findByOwnerIdAndProviderAndExternalId(userId, getProvider(), folderId);
 
         if (folder.isEmpty()) {
-            return null;
+            return new FolderContentsDto(List.of(), List.of());
         }
 
         List<FolderDto> folders = folder.get().getFolders().stream()
-                .map(f -> new FolderDto(f.getName(), getProvider(), f.getExternalId(), f.getExternalId()))
+                .map(f -> new FolderDto(
+                        f.getName(),
+                        getProvider(),
+                        f.getExternalId(),
+                        f.getExternalId()
+                ))
                 .sorted(Comparator.comparing(FolderDto::name))
                 .collect(Collectors.toList());
 

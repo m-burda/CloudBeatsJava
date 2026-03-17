@@ -78,7 +78,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
     @Override
     public FolderContentsDto listFiles(UUID userId, String externalUserId, String folderId) {
         FolderContentsDto cachedResult = getFolderContentsFromCache(userId, folderId);
-        if (cachedResult != null) {
+        if (!cachedResult.files().isEmpty() || !cachedResult.folders().isEmpty()) {
             return cachedResult;
         }
 
