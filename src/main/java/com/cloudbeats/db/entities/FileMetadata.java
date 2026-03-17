@@ -2,6 +2,7 @@ package com.cloudbeats.db.entities;
 
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import org.springframework.data.annotation.LastModifiedDate;
 
 import java.util.Date;
 
@@ -9,6 +10,7 @@ import java.util.Date;
 public class FileMetadata {
     private String previewUrl;
     private String fileHash;
+    @LastModifiedDate
     private Date lastModified;
     @Id
     private String fileId;
