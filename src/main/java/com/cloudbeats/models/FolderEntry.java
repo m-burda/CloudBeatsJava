@@ -8,6 +8,7 @@ public record FolderEntry (
     String previewUrl,
     FileType type,
     String name,
+    Provider provider,
     String path,
     String id,
     AudioFileMetadata metadata,

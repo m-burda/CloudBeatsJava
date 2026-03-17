@@ -101,6 +101,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                                 entry.getPreviewUrl(),
                                 fileType,
                                 entry.getName(),
+                                getProvider(),
                                 entry.getPathLower(),
                                 entry.getPathLower(),
                                 null,

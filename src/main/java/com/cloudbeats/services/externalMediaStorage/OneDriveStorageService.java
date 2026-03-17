@@ -152,6 +152,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                             null,
                             fileType,
                             item.getName(),
+                            getProvider(),
                             item.getId(),
                             item.getId(),
                             null,

@@ -1,21 +1,15 @@
 package com.cloudbeats.services;
 
 import com.cloudbeats.db.entities.*;
-import com.cloudbeats.models.FileType;
-import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
 import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.repositories.FolderRepository;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class FolderService {
