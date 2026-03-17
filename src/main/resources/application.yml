@@ -1,6 +1,8 @@
 spring:
   application:
     name: CloudBeats
+  profiles:
+    active: dev
 
   config:
     import: optional:file:.env.dev[.properties]

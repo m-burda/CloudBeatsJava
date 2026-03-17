@@ -1,15 +1,19 @@
 package com.cloudbeats.services.externalMediaStorage;
 
 import com.cloudbeats.db.entities.ApplicationUser;
+import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.AudioFileMetadata;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.db.entities.StoredFolder;
+import com.cloudbeats.dto.AudioMetadataExtractionDto;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
+import com.cloudbeats.repositories.ArtistRepository;
 import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.repositories.FolderRepository;
+import com.cloudbeats.services.FileManagementService;
 import jakarta.transaction.Transactional;
 import org.apache.tika.Tika;
 
@@ -28,12 +32,16 @@ public abstract class ExternalMediaStorageService {
     private final ApplicationUserRepository userRepository;
     protected final FolderRepository folderRepository;
     protected final FileRepository fileRepository;
+    protected final ArtistRepository artistRepository;
+    protected final FileManagementService fileManagementService;
     protected static final Duration PREVIEW_URL_EXPIRE_DURATION = Duration.ofMinutes(10);
 
-    protected ExternalMediaStorageService(ApplicationUserRepository userRepository, FolderRepository folderRepository, FileRepository fileRepository) {
+    protected ExternalMediaStorageService(ApplicationUserRepository userRepository, FolderRepository folderRepository, FileRepository fileRepository, ArtistRepository artistRepository, FileManagementService fileManagementService) {
         this.userRepository = userRepository;
         this.folderRepository = folderRepository;
         this.fileRepository = fileRepository;
+        this.artistRepository = artistRepository;
+        this.fileManagementService = fileManagementService;
     }
 
     public abstract Provider getProvider();
@@ -47,6 +55,30 @@ public abstract class ExternalMediaStorageService {
                 .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
         storedFile.setMetadataJson(metadata);
         fileRepository.save(storedFile);
+    }
+
+    @Transactional
+    public AudioFileMetadata convertMetadata(AudioMetadataExtractionDto dto, UUID userId) {
+        // TODO srp
+        AudioFileMetadata metadata = new AudioFileMetadata();
+        metadata.setTitle(dto.getTitle());
+        metadata.setAlbum(dto.getAlbum());
+        metadata.setAlbumCoverUrl(dto.getAlbumCoverUrl());
+        metadata.setGenres(dto.getGenres());
+        metadata.setYear(dto.getYear());
+        metadata.setDuration(dto.getDuration());
+
+        ApplicationUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        Artist artist = artistRepository.findByNameAndUserIdOrderByNameAsc(dto.getArtistName(), user.getId())
+                .orElseGet(() -> {
+                    Artist newArtist = new Artist(dto.getArtistName(), user);
+                    return artistRepository.save(newArtist);
+                });
+
+        metadata.setAlbumArtists(List.of(artist));
+        return metadata;
     }
 
     @Transactional
@@ -103,12 +135,11 @@ public abstract class ExternalMediaStorageService {
         try {
             String mimeType = tika.detect(file);
             return switch (mimeType) {
-                case "audio/mpeg" -> ".mp3";
                 case "audio/x-flac", "audio/flac" -> ".flac";
                 case "audio/mp4", "audio/x-m4a" -> ".m4a";
                 case "audio/ogg", "application/ogg" -> ".ogg";
                 case "audio/x-wav", "audio/wav" -> ".wav";
-                default -> ".mp3"; // Default fallback
+                default -> ".mp3";
             };
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -117,14 +148,12 @@ public abstract class ExternalMediaStorageService {
 
     @Transactional
     protected void updateFolderContents(UUID userId, String folderId, List<FolderEntry> entries) {
-        // Get the current user
         ApplicationUser currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
-        // Get or create the parent folder
         String normalizedFolderId = folderId.equals("/") ? "" : folderId;
-        var parentFolder = folderRepository.findByOwnerIdAndProviderAndExternalId(
-                userId, getProvider(), normalizedFolderId
+    var parentFolder = folderRepository.findByOwnerIdAndProviderAndExternalId(
+            userId, getProvider(), normalizedFolderId
         ).orElseGet(() -> {
             var folder = new StoredFolder();
             folder.setExternalId(normalizedFolderId);
@@ -135,14 +164,11 @@ public abstract class ExternalMediaStorageService {
             return folder;
         });
 
-        // Update last synced time
-        parentFolder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
-
-        // Clear existing subfolders and files
         parentFolder.getFolders().clear();
         parentFolder.getFiles().clear();
 
-        // Save folder and file entries
+        parentFolder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
+
         for (FolderEntry entry : entries) {
             if (entry.type() == FileType.FOLDER) {
                 var folder = new StoredFolder();

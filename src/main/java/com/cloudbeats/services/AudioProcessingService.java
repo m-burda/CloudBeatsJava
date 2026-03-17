@@ -1,9 +1,9 @@
 package com.cloudbeats.services;
 
-import com.cloudbeats.db.entities.AudioFileMetadata;
+import com.cloudbeats.dto.AudioMetadataExtractionDto;
 
 import java.io.File;
 
 public interface AudioProcessingService {
-    public AudioFileMetadata extractAudioMetadata(String originalFileName, File file);
+    AudioMetadataExtractionDto extractAudioMetadata(String originalFileName, File file);
 }

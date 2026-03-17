@@ -1,14 +1,14 @@
 package com.cloudbeats.services;
 
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-@Primary
 @Service
+@Profile("!dev")
 public class LocalFileManagementService implements FileManagementService {
     private final Path storagePath = Paths.get(System.getProperty("user.dir")).resolve("files");
 

@@ -12,10 +12,12 @@ import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
+import com.cloudbeats.repositories.ArtistRepository;
 import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.repositories.FolderRepository;
 import com.cloudbeats.repositories.MediaStorageAccountRepository;
 import com.cloudbeats.services.AudioProcessingService;
+import com.cloudbeats.services.FileManagementService;
 import com.microsoft.aad.msal4j.ClientCredentialFactory;
 import com.microsoft.aad.msal4j.ConfidentialClientApplication;
 import com.microsoft.aad.msal4j.IAuthenticationResult;
@@ -48,9 +50,11 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             FolderRepository folderRepository,
             FileRepository fileRepository,
             OneDriveClientProperties clientProperties,
-            AudioProcessingService audioProcessingService
+            AudioProcessingService audioProcessingService,
+            ArtistRepository artistRepository,
+            FileManagementService fileManagementService
     ) {
-        super(userRepository, folderRepository, fileRepository);
+        super(userRepository, folderRepository, fileRepository, artistRepository, fileManagementService);
         this.mediaStorageAccountRepository = mediaStorageAccountRepository;
         this.fileRepository = fileRepository;
         this.audioProcessingService = audioProcessingService;
@@ -156,7 +160,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 })
                 .collect(Collectors.toList());
 
-//        updateFolderContents(userId, folderId, entries);
+        updateFolderContents(userId, folderId, entries);
 
         return entries;
     }
@@ -188,7 +192,8 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 tempFile = renamedFile;
             }
 
-            var metadata = audioProcessingService.extractAudioMetadata(fileId, tempFile);
+            var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
+            var metadata = convertMetadata(extractedDto, userId);
             metadata.setPreviewUrl(getFilePreviewUrl(userId, fileId));
             updateFileMetadata(userId, fileId, metadata);
 

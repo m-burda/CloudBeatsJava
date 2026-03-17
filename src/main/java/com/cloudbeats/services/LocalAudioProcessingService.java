@@ -1,8 +1,6 @@
 package com.cloudbeats.services;
 
-import com.cloudbeats.db.entities.Artist;
-import com.cloudbeats.db.entities.AudioFileMetadata;
-import com.cloudbeats.repositories.ArtistRepository;
+import com.cloudbeats.dto.AudioMetadataExtractionDto;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.audio.AudioHeader;
@@ -22,52 +20,64 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.List;
 
 @Service
 public class LocalAudioProcessingService implements AudioProcessingService {
     private final FileManagementService fileManagementService;
-    private final ArtistRepository artistRepository;
 
     @Value("${cloudbeats.storage.artwork}")
     private Path artworkPath;
 
-    public LocalAudioProcessingService(FileManagementService fileManagementService, ArtistRepository artistRepository) {
+    public LocalAudioProcessingService(FileManagementService fileManagementService) {
         this.fileManagementService = fileManagementService;
-        this.artistRepository = artistRepository;
     }
 
-    public AudioFileMetadata extractAudioMetadata(String originalFileName, File file){
+    public AudioMetadataExtractionDto extractAudioMetadata(String originalFileName, File file) {
         try {
             AudioFile f = AudioFileIO.read(file);
             Tag tag = f.getTag();
             AudioHeader header = f.getAudioHeader();
 
-            AudioFileMetadata extracted = new AudioFileMetadata();
-
             if (tag == null) {
-                extracted.setTitle(originalFileName);
-                Artist unknownArtist = getOrCreateArtist("Unknown Artist");
-                extracted.setAlbumArtists(List.of(unknownArtist));
-                extracted.setAlbum("Unknown");
-                return extracted;
+                return new AudioMetadataExtractionDto(
+                        originalFileName,
+                        "Unknown Artist",
+                        "Unknown",
+                        null,
+                        null,
+                        null,
+                        header != null ? header.getTrackLength() : 0
+                );
             }
 
-            extracted.setTitle(tag.getFirst(FieldKey.TITLE));
-            extracted.setAlbum(tag.getFirst(FieldKey.ALBUM));
-
+            String title = tag.getFirst(FieldKey.TITLE);
+            String album = tag.getFirst(FieldKey.ALBUM);
             String artistName = tag.getFirst(FieldKey.ARTIST);
-            Artist artist = getOrCreateArtist(artistName);
-            extracted.setAlbumArtists(List.of(artist));
+            Integer year = null;
+            try {
+                String yearStr = tag.getFirst(FieldKey.YEAR);
+                if (yearStr != null && !yearStr.isEmpty()) {
+                    year = Integer.parseInt(yearStr);
+                }
+            } catch (NumberFormatException e) {
+                // Year parsing failed, leave as null
+            }
 
+            String albumCoverUrl = null;
             var artwork = tag.getFirstArtwork();
             if (artwork != null) {
-                var filePath = artworkPath.resolve(generateArtworkName(artwork));
-                fileManagementService.writeData(artwork.getBinaryData(), filePath);
-                extracted.setAlbumCoverUrl(filePath.toString());
+                albumCoverUrl = saveArtwork(artwork);
             }
-            extracted.setDuration(header.getTrackLength());
-            return extracted;
+
+            return new AudioMetadataExtractionDto(
+                    title,
+                    artistName != null && !artistName.isEmpty() ? artistName : "Unknown Artist",
+                    album,
+                    albumCoverUrl,
+                    null,
+                    year,
+                    header != null ? header.getTrackLength() : 0
+            );
         } catch (CannotReadException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
@@ -81,15 +91,9 @@ public class LocalAudioProcessingService implements AudioProcessingService {
         }
     }
 
-    private Artist getOrCreateArtist(String artistName) {
-        final String finalArtistName = (artistName == null || artistName.trim().isEmpty())
-                ? "Unknown Artist"
-                : artistName;
-        return artistRepository.findById(finalArtistName)
-                .orElseGet(() -> {
-                    Artist newArtist = new Artist(finalArtistName);
-                    return artistRepository.save(newArtist);
-                });
+    public String saveArtwork(Artwork artwork) {
+        var filePath = artworkPath.resolve(generateArtworkName(artwork));
+        return fileManagementService.writeData(artwork.getBinaryData(), filePath);
     }
 
     private String generateArtworkName(Artwork artwork) {
@@ -106,6 +110,5 @@ public class LocalAudioProcessingService implements AudioProcessingService {
             throw new RuntimeException(e);
         }
     }
-
 
 }

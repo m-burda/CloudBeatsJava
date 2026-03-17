@@ -6,11 +6,9 @@ import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.FolderEntry;
 import com.cloudbeats.models.Provider;
-import com.cloudbeats.repositories.ApplicationUserRepository;
-import com.cloudbeats.repositories.FileRepository;
-import com.cloudbeats.repositories.FolderRepository;
-import com.cloudbeats.repositories.MediaStorageAccountRepository;
+import com.cloudbeats.repositories.*;
 import com.cloudbeats.services.AudioProcessingService;
+import com.cloudbeats.services.FileManagementService;
 import com.dropbox.core.DbxException;
 import com.dropbox.core.DbxRequestConfig;
 import com.dropbox.core.oauth.DbxCredential;
@@ -34,9 +32,10 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             ApplicationUserRepository userRepository,
             MediaStorageAccountRepository mediaStorageAccountRepository,
             FolderRepository folderRepository, FileRepository fileRepository,
-            DropboxClientProperties clientProperties, AudioProcessingService audioProcessingService
+            DropboxClientProperties clientProperties, AudioProcessingService audioProcessingService,
+            ArtistRepository artistRepository, FileManagementService fileManagementService
     ) {
-        super(userRepository, folderRepository, fileRepository);
+        super(userRepository, folderRepository, fileRepository, artistRepository, fileManagementService);
         this.mediaStorageAccountRepository = mediaStorageAccountRepository;
         this.fileRepository = fileRepository;
         this.clientProperties = clientProperties;
@@ -143,17 +142,18 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 tempFile = renamedFile;
             }
 
-            AudioFileMetadata extracted = audioProcessingService.extractAudioMetadata(fileId, tempFile);
+            var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
+            var metadata = convertMetadata(extractedDto, userId);
 
             // TODO extract this to a separate method. Better to cache separately
-            if (isPreviewUrlExpired(extracted)){
+            if (isPreviewUrlExpired(metadata)){
                 String previewUrl = getFilePreviewUrl(userId, fileId);
-                extracted.setPreviewUrl(previewUrl);
+                metadata.setPreviewUrl(previewUrl);
             }
 
-            updateFileMetadata(userId, fileId, extracted);
+            updateFileMetadata(userId, fileId, metadata);
 
-            return extracted;
+            return metadata;
 
         } catch (Exception e) {
             throw new RuntimeException("Metadata extraction failed", e);
