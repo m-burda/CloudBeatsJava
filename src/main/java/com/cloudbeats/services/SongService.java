@@ -1,5 +1,6 @@
 package com.cloudbeats.services;
 
+import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.dto.Song;
 import com.cloudbeats.repositories.FileRepository;
@@ -27,16 +28,19 @@ public class SongService {
     private Song toSongDto(StoredFile file) {
         var metadata = file.getMetadataJson();
 
-        String albumCoverUrl = "";
+        String albumCoverUrl = null;
         if(metadata != null && metadata.getAlbumCoverUrl() != null) {
             metadata.setAlbumCoverUrl(fileManagementService.generateAccessUrlIfExpired(metadata.getAlbumCoverUrl(), Duration.ofDays(7)));
         }
+        String previewUrl = metadata == null ? null : metadata.getPreviewUrl();
+        List<String> artists = metadata == null ? null : metadata.getAlbumArtists().stream().map(Artist::getName).toList();
         return new Song(
                 file.getName(),
+                artists,
                 file.getProvider(),
                 file.getExternalId(),
                 file.getExternalId(),
-                metadata == null ? null : metadata.getPreviewUrl(),
+                previewUrl,
                 albumCoverUrl,
                 metadata
         );

@@ -53,6 +53,14 @@ public abstract class ExternalMediaStorageService {
         if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
             AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
             AudioFileMetadataDto response = toAudioFileMetadataDto(cachedMetadata);
+
+            // TODO side effect
+            if (isPreviewUrlExpired(cachedMetadata)){
+                String previewUrl = getFilePreviewUrl(userId, fileId);
+                cachedMetadata.setPreviewUrl(previewUrl);
+                updateFileMetadata(userId, fileId, cachedMetadata);
+            }
+
             return Optional.of(response);
         }
         return Optional.empty();

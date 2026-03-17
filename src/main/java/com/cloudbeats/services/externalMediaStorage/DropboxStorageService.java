@@ -146,11 +146,8 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             var metadata = convertMetadata(extractedDto, userId);
 
             // TODO extract this to a separate method. Better to cache separately
-            if (isPreviewUrlExpired(metadata)){
-                String previewUrl = getFilePreviewUrl(userId, fileId);
-                metadata.setPreviewUrl(previewUrl);
-            }
-
+            String previewUrl = getFilePreviewUrl(userId, fileId);
+            metadata.setPreviewUrl(previewUrl);
             updateFileMetadata(userId, fileId, metadata);
 
             return toAudioFileMetadataDto(metadata);
