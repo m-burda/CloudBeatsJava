@@ -25,7 +25,7 @@ import java.util.HexFormat;
 public class LocalAudioProcessingService implements AudioProcessingService {
     private final FileManagementService fileManagementService;
 
-    @Value("${cloudbeats.storage.artwork}")
+    @Value("${storage.local.artwork}")
     private Path artworkPath;
 
     public LocalAudioProcessingService(FileManagementService fileManagementService) {

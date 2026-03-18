@@ -2,10 +2,7 @@ spring:
   application:
     name: CloudBeats
   profiles:
-    active: local
-
-  config:
-    import: optional:file:.env.dev[.properties]
+    active: docker
 
   security:
     user:
@@ -56,9 +53,9 @@ spring:
             user-name-attribute: displayName
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/cloudbeats
-    username: efortls
-    password: pass1234
+    url: jdbc:postgresql://postgres:5432/cloudbeats
+    username: cloudbeats
+    password: cloudbeats_password
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -68,16 +65,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-    show-sql: true
-
-h2:
-  console:
-    enabled: true
-    path: /h2-console
-    settings:
-      web-allow-others: true
+    show-sql: false
 
 server:
+  port: 8080
   servlet:
     session:
       timeout: 1h
@@ -90,24 +81,22 @@ server:
 
 logging:
   level:
-    org.springframework.security: DEBUG
-  hibernate:
-    type:
-      descriptor:
-        sql:
-          BasicBinder: TRACE
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate: INFO
 
 jwt:
   secret: mysecretkey
   expiration: 3600000
   issuer: cloudbeats
 
-storage:
-  minio:
-    endpoint: http://localhost:9000
-    access-key: ${MINIO_ACCESS_KEY:minioadmin}
-    secret-key: ${MINIO_SECRET_KEY:minioadmin}
-    bucket-name: cloudbeats-local
-  local:
-    artwork: ./artworks
+cloudbeats:
+  storage:
+    artwork: artworks
+
+minio:
+  url: http://minio:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: cloudbeats
 

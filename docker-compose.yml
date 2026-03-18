@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudbeats-postgres
+    environment:
+      POSTGRES_DB: cloudbeats
+      POSTGRES_USER: cloudbeats
+      POSTGRES_PASSWORD: cloudbeats_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudbeats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloudbeats-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: cloudbeats-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - cloudbeats-network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: cloudbeats-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set minio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb minio/cloudbeats --ignore-existing;
+      /usr/bin/mc version enable minio/cloudbeats;
+      exit 0;
+      "
+    networks:
+      - cloudbeats-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cloudbeats-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      DROPBOX_CLIENT_ID: ${DROPBOX_CLIENT_ID}
+      DROPBOX_CLIENT_SECRET: ${DROPBOX_CLIENT_SECRET}
+      ONEDRIVE_CLIENT_ID: ${ONEDRIVE_CLIENT_ID}
+      ONEDRIVE_CLIENT_SECRET: ${ONEDRIVE_CLIENT_SECRET}
+    ports:
+      - "8080:8080"
+    networks:
+      - cloudbeats-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  cloudbeats-network:
+    driver: bridge
+
+
+
