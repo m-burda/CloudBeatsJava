@@ -7,6 +7,7 @@ import com.cloudbeats.factories.ExternalMediaStorageServiceFactory;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.services.ApplicationUserService;
 import com.cloudbeats.services.externalMediaStorage.ExternalMediaStorageService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,6 +49,13 @@ public class ExternalMediaStorageController {
         AudioFileMetadataDto metadata = storageService.getOrUpdateAudioMetadata(requestData.Path);
 
         return ResponseEntity.ok(metadata);
+    }
+
+    @DeleteMapping("/files")
+    public ResponseEntity<HttpStatus> deleteAllFoldersAndFiles() {
+        ExternalMediaStorageService storageService = storageFactory.getService(Provider.dropbox);
+        storageService.deleteAllFoldersAndFiles();
+        return ResponseEntity.noContent().build();
     }
 
 

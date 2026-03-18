@@ -10,13 +10,10 @@ import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;
 import com.cloudbeats.dto.Song;
+import com.cloudbeats.repositories.*;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.Provider;
-import com.cloudbeats.repositories.ApplicationUserRepository;
-import com.cloudbeats.repositories.ArtistRepository;
-import com.cloudbeats.repositories.FileRepository;
-import com.cloudbeats.repositories.FolderRepository;
 import com.cloudbeats.services.FileManagementService;
 import jakarta.transaction.Transactional;
 import org.apache.tika.Tika;
@@ -39,8 +36,8 @@ public abstract class ExternalMediaStorageService {
     protected final ArtistRepository artistRepository;
     protected final FileManagementService fileManagementService;
     protected static final Duration PREVIEW_URL_EXPIRE_DURATION = Duration.ofMinutes(10);
-    protected OAuth2AuthorizedClientManager authorizedClientManager;
-    protected SecurityUtils securityUtils;
+    protected final OAuth2AuthorizedClientManager authorizedClientManager;
+    protected final SecurityUtils securityUtils;
 
     protected ExternalMediaStorageService(
             ApplicationUserRepository userRepository,
@@ -256,5 +253,11 @@ public abstract class ExternalMediaStorageService {
                 metadata.getDuration(),
                 metadata.getPreviewUrl()
         );
+    }
+
+    @Transactional
+    public void deleteAllFoldersAndFiles() {
+        UUID userId = securityUtils.getCurrentUserId();
+        fileRepository.deleteAllFilesAndFoldersForUserId(userId);
     }
 }

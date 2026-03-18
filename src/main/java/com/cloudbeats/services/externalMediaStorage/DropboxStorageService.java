@@ -25,14 +25,11 @@ import java.util.*;
 
 @Service
 public class DropboxStorageService extends ExternalMediaStorageService {
-    private final MediaStorageAccountRepository mediaStorageAccountRepository;
-    private final FileRepository fileRepository;
     private final DropboxClientProperties clientProperties;
     private final AudioProcessingService audioProcessingService;
 
     public DropboxStorageService(
             ApplicationUserRepository userRepository,
-            MediaStorageAccountRepository mediaStorageAccountRepository,
             FolderRepository folderRepository,
             FileRepository fileRepository,
             DropboxClientProperties clientProperties,
@@ -42,9 +39,15 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             OAuth2AuthorizedClientManager authorizedClientManager,
             SecurityUtils securityUtils
     ) {
-        super(userRepository, folderRepository, fileRepository, artistRepository, fileManagementService, authorizedClientManager, securityUtils);
-        this.mediaStorageAccountRepository = mediaStorageAccountRepository;
-        this.fileRepository = fileRepository;
+        super(
+                userRepository,
+                folderRepository,
+                fileRepository,
+                artistRepository,
+                fileManagementService,
+                authorizedClientManager,
+                securityUtils
+        );
         this.clientProperties = clientProperties;
         this.audioProcessingService = audioProcessingService;
     }

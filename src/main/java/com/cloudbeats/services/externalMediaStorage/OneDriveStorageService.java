@@ -8,13 +8,9 @@ import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;
 import com.cloudbeats.dto.Song;
+import com.cloudbeats.repositories.*;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
-import com.cloudbeats.repositories.ApplicationUserRepository;
-import com.cloudbeats.repositories.ArtistRepository;
-import com.cloudbeats.repositories.FileRepository;
-import com.cloudbeats.repositories.FolderRepository;
-import com.cloudbeats.repositories.MediaStorageAccountRepository;
 import com.cloudbeats.services.AudioProcessingService;
 import com.cloudbeats.services.FileManagementService;
 import com.microsoft.aad.msal4j.ClientCredentialFactory;
@@ -52,7 +48,15 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             OAuth2AuthorizedClientManager authorizedClientManager,
             SecurityUtils securityUtils
     ) {
-        super(userRepository, folderRepository, fileRepository, artistRepository, fileManagementService, authorizedClientManager, securityUtils);
+        super(
+                userRepository,
+                folderRepository,
+                fileRepository,
+                artistRepository,
+                fileManagementService,
+                authorizedClientManager,
+                securityUtils
+        );
         this.mediaStorageAccountRepository = mediaStorageAccountRepository;
         this.audioProcessingService = audioProcessingService;
         this.clientProperties = clientProperties;

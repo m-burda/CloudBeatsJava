@@ -10,5 +10,5 @@ import java.util.UUID;
 public interface FolderRepository extends CrudRepository<StoredFolder, UUID> {
     Optional<StoredFolder> findByOwnerIdAndProviderAndExternalId(UUID ownerId, Provider provider, String externalId);
     Optional<StoredFolder> findByOwnerIdAndProviderAndParentIsNull(UUID ownerId, Provider provider);
+    void deleteAllByOwnerId(UUID ownerId);
 }
-

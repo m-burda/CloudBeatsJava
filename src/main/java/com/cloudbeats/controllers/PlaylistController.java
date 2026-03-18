@@ -1,14 +1,11 @@
 package com.cloudbeats.controllers;
 
-import com.cloudbeats.db.entities.ApplicationUser;
 import com.cloudbeats.dto.PlaylistDto;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.services.ApplicationUserService;
 import com.cloudbeats.services.PlaylistService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
