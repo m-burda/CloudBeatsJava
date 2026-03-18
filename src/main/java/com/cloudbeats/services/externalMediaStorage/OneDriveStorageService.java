@@ -4,7 +4,7 @@ import com.azure.core.credential.AccessToken;
 import com.azure.core.credential.TokenCredential;
 import com.azure.identity.ClientSecretCredential;
 import com.azure.identity.ClientSecretCredentialBuilder;
-import com.cloudbeats.db.config.OneDriveClientProperties;
+import com.cloudbeats.config.OneDriveClientProperties;
 import com.cloudbeats.db.entities.MediaStorageAccount;
 import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;

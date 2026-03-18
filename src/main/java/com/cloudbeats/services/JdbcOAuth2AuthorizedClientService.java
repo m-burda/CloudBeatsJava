@@ -5,10 +5,16 @@ import com.cloudbeats.db.entities.MediaStorageAccount;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
 import com.cloudbeats.repositories.MediaStorageAccountRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Date;
 
@@ -53,12 +59,20 @@ public class JdbcOAuth2AuthorizedClientService implements OAuth2AuthorizedClient
 
     @Override
     public OAuth2AuthorizedClient loadAuthorizedClient(String registrationId, String principalName) {
-        // You can implement this to load tokens back into Spring's context if needed
         return null;
     }
 
     @Override
     public void removeAuthorizedClient(String registrationId, String principalName) {
-        // Logic for unlinking accounts
+        ApplicationUser user = userRepository.findByUsername(principalName)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Provider provider = Provider.valueOf(registrationId);
+
+        var account = mediaStorageAccountRepository.findByUserIdAndProvider(user.getId(), provider).orElseThrow(
+                () -> new RuntimeException("No linked account found for provider: " + provider)
+        );
+
+        mediaStorageAccountRepository.delete(account);
     }
 }

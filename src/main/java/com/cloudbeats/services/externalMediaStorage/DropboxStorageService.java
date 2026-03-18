@@ -1,6 +1,6 @@
 package com.cloudbeats.services.externalMediaStorage;
 
-import com.cloudbeats.db.config.DropboxClientProperties;
+import com.cloudbeats.config.DropboxClientProperties;
 import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;

@@ -1,6 +1,6 @@
 package com.cloudbeats.services;
 
-import com.cloudbeats.db.config.S3Config;
+import com.cloudbeats.config.S3Config;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.sync.RequestBody;

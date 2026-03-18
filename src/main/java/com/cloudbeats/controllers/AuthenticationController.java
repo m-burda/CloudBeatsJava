@@ -136,4 +136,15 @@ public class AuthenticationController {
             return ResponseEntity.status(401).body("Unauthorized");
         }
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<String> logout(HttpServletRequest servletRequest) {
+        HttpSession session = servletRequest.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.ok("Logout successful");
+    }
+
 }

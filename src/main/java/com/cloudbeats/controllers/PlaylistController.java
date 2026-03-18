@@ -67,7 +67,7 @@ public class PlaylistController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/files")
+    @PostMapping("/{id}/songs")
     public ResponseEntity<PlaylistDto> addSong(
             @PathVariable Long id,
             @RequestBody SongReference request,
@@ -76,7 +76,7 @@ public class PlaylistController {
         return ResponseEntity.ok(playlistService.addSong(id, request.provider(), request.externalId(), user.getId()));
     }
 
-    @DeleteMapping("/{id}/files")
+    @DeleteMapping("/{id}/songs")
     public ResponseEntity<PlaylistDto> removeSong(
             @PathVariable Long id,
             @RequestBody SongReference request,
