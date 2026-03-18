@@ -108,12 +108,13 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
         return Provider.onedrive;
     }
 
-    @Override
     @Transactional
-    public FolderContentsDto listFiles(String folderId) {
-        Optional<FolderContentsDto> cachedResult = getFolderContentsFromCache(folderId);
-        if (cachedResult.isPresent()) {
-            return cachedResult.get();
+    public FolderContentsDto listFiles(String folderId, boolean cached) {
+        if (cached) {
+            Optional<FolderContentsDto> cachedResult = getFolderContentsFromCache(folderId);
+            if (cachedResult.isPresent()) {
+                return cachedResult.get();
+            }
         }
 
         GraphServiceClient graphClient = getGraphClient();
@@ -206,4 +207,3 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
         return downloadUrl.toString();
     }
 }
-

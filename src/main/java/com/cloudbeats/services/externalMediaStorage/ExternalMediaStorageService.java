@@ -68,7 +68,7 @@ public abstract class ExternalMediaStorageService {
 
     public abstract Provider getProvider();
 
-    public abstract FolderContentsDto listFiles(String folderId);
+    public abstract FolderContentsDto listFiles(String folderId, boolean cached);
 
     public abstract AudioFileMetadataDto getOrUpdateAudioMetadata(String fileId);
 

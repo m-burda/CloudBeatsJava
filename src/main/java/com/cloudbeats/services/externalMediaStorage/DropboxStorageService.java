@@ -75,11 +75,12 @@ public class DropboxStorageService extends ExternalMediaStorageService {
         return Provider.dropbox;
     }
 
-    @Override
-    public FolderContentsDto listFiles(String folderId) {
-        Optional<FolderContentsDto> cachedResult = getFolderContentsFromCache(folderId);
-        if (cachedResult.isPresent()) {
-            return cachedResult.get();
+    public FolderContentsDto listFiles(String folderId, boolean cached) {
+        if (cached) {
+            Optional<FolderContentsDto> cachedResult = getFolderContentsFromCache(folderId);
+            if (cachedResult.isPresent()) {
+                return cachedResult.get();
+            }
         }
 
         DbxClientV2 client = getDbxClient();

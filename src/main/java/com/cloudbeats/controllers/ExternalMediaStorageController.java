@@ -15,23 +15,19 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/account/external")
 public class ExternalMediaStorageController {
     private final ExternalMediaStorageServiceFactory storageFactory;
-    private final ApplicationUserService userService;
-    private final SecurityUtils securityUtils;
 
-
-    public ExternalMediaStorageController(ExternalMediaStorageServiceFactory storageFactory, ApplicationUserService userService, SecurityUtils securityUtils) {
+    public ExternalMediaStorageController(ExternalMediaStorageServiceFactory storageFactory) {
         this.storageFactory = storageFactory;
-        this.userService = userService;
-        this.securityUtils = securityUtils;
     }
 
     @GetMapping("/{provider}/files/list")
     public ResponseEntity<FolderContentsDto> listFiles(
         @PathVariable Provider provider,
-        @RequestParam(defaultValue = "") String path
+        @RequestParam(defaultValue = "") String path,
+        @RequestParam(defaultValue = "true") boolean cached
     ) {
         ExternalMediaStorageService storageService = storageFactory.getService(provider);
-        FolderContentsDto contents = storageService.listFiles(path);
+        FolderContentsDto contents = storageService.listFiles(path, cached);
 
         return ResponseEntity.ok(contents);
     }
