@@ -21,9 +21,7 @@ public class ArtistsController {
     }
 
     @GetMapping
-    public List<ArtistDto> getAllArtists(
-            @AuthenticationPrincipal UserDetails principal
-    ) {
-        return artistService.getAllArtists(principal.getUsername());
+    public List<ArtistDto> getAllArtists() {
+        return artistService.getAllArtists();
     }
 }

@@ -18,10 +18,6 @@ public class ApplicationUser implements UserDetails {
     private String username;
     private String password;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<MediaStorageAccount> mediaStorageAccounts;
-
-    // Getters and setters
     public UUID getId() {
         return id;
     }
@@ -38,17 +34,9 @@ public class ApplicationUser implements UserDetails {
         this.username = username;
     }
 
-    public List<MediaStorageAccount> getMediaStorageAccounts() {
-        return mediaStorageAccounts;
-    }
-
-    public void setMediaStorageAccounts(List<MediaStorageAccount> mediaStorageAccounts) {
-        this.mediaStorageAccounts = mediaStorageAccounts;
-    }
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(); // Implement roles/authorities if needed
+        return List.of();
     }
 
     @Override

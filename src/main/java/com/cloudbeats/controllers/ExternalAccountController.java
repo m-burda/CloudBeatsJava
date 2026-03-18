@@ -20,14 +20,10 @@ import java.io.IOException;
 @RestController
 @RequestMapping("/api/account/external")
 public class ExternalAccountController {
-    private final ApplicationUserService userService;
-    private final MediaStorageAccountRepository mediaStorageAccountRepository;
     private final OAuth2AuthorizedClientService oAuth2AuthorizedClientService;
     private final OAuth2AuthorizedClientManager authorizedClientManager;
 
-    public ExternalAccountController(ApplicationUserService userService, MediaStorageAccountRepository mediaStorageAccountRepository, OAuth2AuthorizedClientService oAuth2AuthorizedClientService, OAuth2AuthorizedClientManager authorizedClientManager) {
-        this.userService = userService;
-        this.mediaStorageAccountRepository = mediaStorageAccountRepository;
+    public ExternalAccountController(OAuth2AuthorizedClientService oAuth2AuthorizedClientService, OAuth2AuthorizedClientManager authorizedClientManager) {
         this.oAuth2AuthorizedClientService = oAuth2AuthorizedClientService;
         this.authorizedClientManager = authorizedClientManager;
     }

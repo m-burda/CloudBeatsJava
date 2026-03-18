@@ -8,6 +8,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class ApplicationUserService implements UserDetailsService {
     private final ApplicationUserRepository userRepository;
@@ -18,14 +20,13 @@ public class ApplicationUserService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        ApplicationUser user = findApplicationUserByUsername(username);
-
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getUsername())
-                .password(user.getPassword())
-                .authorities("USER") // Default role
-                .build();
+        return findApplicationUserByUsername(username);
     }
+
+    public ApplicationUser findApplicationUserById(UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + id));
+        }
 
     public ApplicationUser findApplicationUserByUsername(String username) {
         return userRepository.findByUsername(username)

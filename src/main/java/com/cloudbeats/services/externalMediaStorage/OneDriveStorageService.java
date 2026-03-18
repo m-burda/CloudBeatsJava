@@ -2,14 +2,13 @@ package com.cloudbeats.services.externalMediaStorage;
 
 import com.azure.core.credential.AccessToken;
 import com.azure.core.credential.TokenCredential;
-import com.azure.identity.ClientSecretCredential;
-import com.azure.identity.ClientSecretCredentialBuilder;
 import com.cloudbeats.config.OneDriveClientProperties;
 import com.cloudbeats.db.entities.MediaStorageAccount;
 import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;
 import com.cloudbeats.dto.Song;
+import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
 import com.cloudbeats.repositories.ArtistRepository;
@@ -25,22 +24,20 @@ import com.microsoft.aad.msal4j.RefreshTokenParameters;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import com.microsoft.graph.models.DriveItem;
 import jakarta.transaction.Transactional;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
 public class OneDriveStorageService extends ExternalMediaStorageService {
     private final MediaStorageAccountRepository mediaStorageAccountRepository;
-    private final FileRepository fileRepository;
     private final AudioProcessingService audioProcessingService;
 
     private final OneDriveClientProperties clientProperties;
-    private final ClientSecretCredential credential;
     private final String[] scopes = new String[]{"Files.Read", "Files.Read.All", "User.Read", "offline_access"};
 
     public OneDriveStorageService(
@@ -51,34 +48,25 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             OneDriveClientProperties clientProperties,
             AudioProcessingService audioProcessingService,
             ArtistRepository artistRepository,
-            FileManagementService fileManagementService
+            FileManagementService fileManagementService,
+            OAuth2AuthorizedClientManager authorizedClientManager,
+            SecurityUtils securityUtils
     ) {
-        super(userRepository, folderRepository, fileRepository, artistRepository, fileManagementService);
+        super(userRepository, folderRepository, fileRepository, artistRepository, fileManagementService, authorizedClientManager, securityUtils);
         this.mediaStorageAccountRepository = mediaStorageAccountRepository;
-        this.fileRepository = fileRepository;
         this.audioProcessingService = audioProcessingService;
-        this.credential = new ClientSecretCredentialBuilder()
-                .clientId(clientProperties.getClientId())
-                .tenantId(clientProperties.getTenantId())
-                .clientSecret(clientProperties.getClientSecret())
-                .build();
         this.clientProperties = clientProperties;
     }
 
     @Transactional
-    private GraphServiceClient getGraphClient(UUID userId) {
-        var account = mediaStorageAccountRepository.findByUserIdAndProvider(userId, getProvider())
-                .orElseThrow(() -> new IllegalStateException("No OneDrive account found for user: " + userId));
-
-        boolean isAccessTokenExpired = account.getTokenExpiresAt() == null ||
-                account.getTokenExpiresAt().toInstant().isBefore(Instant.now().plusSeconds(60));
-
-        if (isAccessTokenExpired) {
-            refreshAccessToken(account);
-        }
+    private GraphServiceClient getGraphClient() {
+        var accessToken = getAuthorizedClient().getAccessToken();
 
         TokenCredential credential = request ->
-                Mono.just(new AccessToken(account.getAccessToken(), account.getTokenExpiresAt().toInstant().atOffset(ZoneOffset.UTC)));
+                Mono.just(new AccessToken(
+                        accessToken.getTokenValue(),
+                        accessToken.getExpiresAt().atOffset(ZoneOffset.UTC)
+                ));
 
         return new GraphServiceClient(credential, scopes);
     }
@@ -118,13 +106,13 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
 
     @Override
     @Transactional
-    public FolderContentsDto listFiles(UUID userId, String externalUserId, String folderId) {
-        FolderContentsDto cachedResult = getFolderContentsFromCache(userId, folderId);
-        if (!cachedResult.files().isEmpty() || !cachedResult.folders().isEmpty()) {
-            return cachedResult;
+    public FolderContentsDto listFiles(String folderId) {
+        Optional<FolderContentsDto> cachedResult = getFolderContentsFromCache(folderId);
+        if (cachedResult.isPresent()) {
+            return cachedResult.get();
         }
 
-        GraphServiceClient graphClient = getGraphClient(userId);
+        GraphServiceClient graphClient = getGraphClient();
 
         var childrenResponse = graphClient.drives().byDriveId("me").items().byDriveItemId("root").children().get(config -> {
             config.queryParameters.select = new String[]{"id", "name", "folder", "audio", "file"};
@@ -137,7 +125,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
         List<FolderDto> folders = new ArrayList<>();
         List<Song> songs = new ArrayList<>();
 
-        // Filter directly by mimeType because dogwater OneDrive won't generate metadata
+        // Filter directly by mimeType because dogwater OneDrive won't return metadata
         items.stream()
                 .filter(item ->
                         item.getName() != null
@@ -155,20 +143,21 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 });
 
         FolderContentsDto contents = new FolderContentsDto(folders, songs);
-        updateFolderContents(userId, folderId, contents);
+        updateFolderContents(folderId, contents);
 
         return contents;
     }
 
     @Override
-    public AudioFileMetadataDto getOrUpdateAudioMetadata(UUID userId, String fileId) {
+    public AudioFileMetadataDto getOrUpdateAudioMetadata(String fileId) {
         try {
-            Optional<AudioFileMetadataDto> optionalCachedMetadata = getMetadataFromCache(userId, fileId);
+            UUID userId = securityUtils.getCurrentUserId();
+            Optional<AudioFileMetadataDto> optionalCachedMetadata = getMetadataFromCache(fileId);
             if (optionalCachedMetadata.isPresent()) {
                 return optionalCachedMetadata.get();
             }
 
-            GraphServiceClient graphClient = getGraphClient(userId);
+            GraphServiceClient graphClient = getGraphClient();
 
             InputStream fileStream = graphClient.drives().byDriveId("me").root()
                     .withUrl("https://graph.microsoft.com/v1.0/drives/me/items/" + fileId + "/content")
@@ -187,9 +176,9 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             }
 
             var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
-            var metadata = convertMetadata(extractedDto, userId);
-            metadata.setPreviewUrl(getFilePreviewUrl(userId, fileId));
-            updateFileMetadata(userId, fileId, metadata);
+            var metadata = convertMetadata(extractedDto);
+            metadata.setPreviewUrl(getFilePreviewUrl(fileId));
+            updateFileMetadata(fileId, metadata);
 
             return toAudioFileMetadataDto(metadata);
         } catch (Exception e) {
@@ -198,8 +187,8 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
     }
 
     @Override
-    protected String getFilePreviewUrl(UUID userId, String fileId) {
-        GraphServiceClient graphClient = getGraphClient(userId);
+    protected String getFilePreviewUrl(String fileId) {
+        GraphServiceClient graphClient = getGraphClient();
         DriveItem item = graphClient.drives().byDriveId("me").root()
                 .withUrl("https://graph.microsoft.com/v1.0/drives/me/items/" + fileId)
                 .get();

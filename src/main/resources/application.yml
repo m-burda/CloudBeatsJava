@@ -25,7 +25,7 @@ spring:
           dropbox:
             client-id: ${DROPBOX_CLIENT_ID}
             client-secret: ${DROPBOX_CLIENT_SECRET}
-            redirect-uri: "{baseUrl}/api/external/callback/dropbox"
+            redirect-uri: "{baseUrl}/api/account/external/callback/dropbox"
             authorization-grant-type: authorization_code
             authorization-uri: https://www.dropbox.com/oauth2/authorize?token_access_type=offline
             scope:

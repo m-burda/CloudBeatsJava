@@ -1,5 +1,6 @@
 package com.cloudbeats.services;
 
+import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.repositories.ArtistRepository;
 import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.dto.ArtistDto;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class ArtistService {
@@ -17,21 +19,23 @@ public class ArtistService {
     private final FileRepository fileRepository;
     private final ApplicationUserService applicationUserService;
     private final FileManagementService fileManagementService;
+    private final SecurityUtils securityUtils;
 
-    public ArtistService(ArtistRepository artistRepository, FileRepository fileRepository, ApplicationUserService applicationUserService, FileManagementService fileManagementService) {
+    public ArtistService(ArtistRepository artistRepository, FileRepository fileRepository, ApplicationUserService applicationUserService, FileManagementService fileManagementService, SecurityUtils securityUtils) {
         this.artistRepository = artistRepository;
         this.fileRepository = fileRepository;
         this.applicationUserService = applicationUserService;
         this.fileManagementService = fileManagementService;
+        this.securityUtils = securityUtils;
     }
 
-    public List<ArtistDto> getAllArtists(String userId) {
+    public List<ArtistDto> getAllArtists() {
+        UUID userId = securityUtils.getCurrentUserId();
         // TODO n+1
-        var user = applicationUserService.findApplicationUserByUsername(userId);
-        return artistRepository.findByUserId(user.getId()).stream()
+        return artistRepository.findByUserId(userId).stream()
                 .map(artist -> {
                     // Find the first stored file with metadata containing this artist
-                    var files = fileRepository.findByOwnerIdOrderByName(user.getId());
+                    var files = fileRepository.findByOwnerIdOrderByName(userId);
                     String albumCoverUrl = files.stream()
                             .filter(file -> file.getMetadataJson() != null
                                     && file.getMetadataJson().getAlbumArtists() != null

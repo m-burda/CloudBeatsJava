@@ -26,63 +26,49 @@ public class PlaylistController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PlaylistDto>> getAllPlaylists(
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        return ResponseEntity.ok(playlistService.getAllPlaylists(user.getId()));
+    public ResponseEntity<List<PlaylistDto>> getAllPlaylists() {
+        return ResponseEntity.ok(playlistService.getAllPlaylists());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PlaylistDto> getPlaylist(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        return ResponseEntity.ok(playlistService.getPlaylist(id, user.getId()));
+    public ResponseEntity<PlaylistDto> getPlaylist(@PathVariable Long id) {
+        return ResponseEntity.ok(playlistService.getPlaylist(id));
     }
 
     @PostMapping
-    public ResponseEntity<PlaylistDto> createPlaylist(
-            @RequestBody CreatePlaylistRequest request,
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        PlaylistDto created = playlistService.createPlaylist(request.name(), user);
+    public ResponseEntity<PlaylistDto> createPlaylist(@RequestBody CreatePlaylistRequest request) {
+        PlaylistDto created = playlistService.createPlaylist(request.name());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<PlaylistDto> updatePlaylist(
             @PathVariable Long id,
-            @RequestBody UpdatePlaylistRequest request,
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        return ResponseEntity.ok(playlistService.updatePlaylist(id, request.name(), user.getId()));
+            @RequestBody UpdatePlaylistRequest request
+    ) {
+        return ResponseEntity.ok(playlistService.updatePlaylist(id, request.name()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletePlaylist(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        playlistService.deletePlaylist(id, user.getId());
+    public ResponseEntity<Void> deletePlaylist(@PathVariable Long id) {
+        playlistService.deletePlaylist(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/songs")
     public ResponseEntity<PlaylistDto> addSong(
             @PathVariable Long id,
-            @RequestBody SongReference request,
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        return ResponseEntity.ok(playlistService.addSong(id, request.provider(), request.externalId(), user.getId()));
+            @RequestBody SongReference request
+    ) {
+        return ResponseEntity.ok(playlistService.addSong(id, request.provider, request.externalId()));
     }
 
     @DeleteMapping("/{id}/songs")
     public ResponseEntity<PlaylistDto> removeSong(
             @PathVariable Long id,
-            @RequestBody SongReference request,
-            @AuthenticationPrincipal UserDetails principal) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        return ResponseEntity.ok(playlistService.removeSong(id, request.provider(), request.externalId(), user.getId()));
+            @RequestBody SongReference request
+    ) {
+        return ResponseEntity.ok(playlistService.removeSong(id, request.provider(), request.externalId()));
     }
 
     record CreatePlaylistRequest(String name) {}

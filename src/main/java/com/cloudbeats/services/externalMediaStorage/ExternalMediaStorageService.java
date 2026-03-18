@@ -10,6 +10,7 @@ import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;
 import com.cloudbeats.dto.Song;
+import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.ApplicationUserRepository;
@@ -19,6 +20,9 @@ import com.cloudbeats.repositories.FolderRepository;
 import com.cloudbeats.services.FileManagementService;
 import jakarta.transaction.Transactional;
 import org.apache.tika.Tika;
+import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,24 +39,46 @@ public abstract class ExternalMediaStorageService {
     protected final ArtistRepository artistRepository;
     protected final FileManagementService fileManagementService;
     protected static final Duration PREVIEW_URL_EXPIRE_DURATION = Duration.ofMinutes(10);
+    protected OAuth2AuthorizedClientManager authorizedClientManager;
+    protected SecurityUtils securityUtils;
 
-    protected ExternalMediaStorageService(ApplicationUserRepository userRepository, FolderRepository folderRepository, FileRepository fileRepository, ArtistRepository artistRepository, FileManagementService fileManagementService) {
+    protected ExternalMediaStorageService(
+            ApplicationUserRepository userRepository,
+            FolderRepository folderRepository,
+            FileRepository fileRepository,
+            ArtistRepository artistRepository,
+            FileManagementService fileManagementService,
+            OAuth2AuthorizedClientManager authorizedClientManager,
+            SecurityUtils securityUtils
+    ) {
         this.userRepository = userRepository;
         this.folderRepository = folderRepository;
         this.fileRepository = fileRepository;
         this.artistRepository = artistRepository;
         this.fileManagementService = fileManagementService;
+        this.authorizedClientManager = authorizedClientManager;
+        this.securityUtils = securityUtils;
+    }
+
+    public OAuth2AuthorizedClient getAuthorizedClient() {
+        OAuth2AuthorizeRequest request = OAuth2AuthorizeRequest
+                .withClientRegistrationId(getProvider().name())
+                .principal(securityUtils.getAuthentication())
+                .build();
+
+        return authorizedClientManager.authorize(request);
     }
 
     public abstract Provider getProvider();
 
-    public abstract FolderContentsDto listFiles(UUID userId, String externalUserId, String folderId);
+    public abstract FolderContentsDto listFiles(String folderId);
 
-    public abstract AudioFileMetadataDto getOrUpdateAudioMetadata(UUID userId, String fileId);
+    public abstract AudioFileMetadataDto getOrUpdateAudioMetadata(String fileId);
 
-    protected abstract String getFilePreviewUrl(UUID userId, String fileId);
+    protected abstract String getFilePreviewUrl(String fileId);
 
-    protected Optional<AudioFileMetadataDto> getMetadataFromCache(UUID userId, String fileId) {
+    protected Optional<AudioFileMetadataDto> getMetadataFromCache(String fileId) {
+        UUID userId = securityUtils.getCurrentUserId();
         Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
 
         if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
@@ -61,9 +87,9 @@ public abstract class ExternalMediaStorageService {
 
             // TODO side effect
             if (isPreviewUrlExpired(cachedMetadata)) {
-                String previewUrl = getFilePreviewUrl(userId, fileId);
+                String previewUrl = getFilePreviewUrl(fileId);
                 cachedMetadata.setPreviewUrl(previewUrl);
-                updateFileMetadata(userId, fileId, cachedMetadata);
+                updateFileMetadata(fileId, cachedMetadata);
             }
 
             return Optional.of(response);
@@ -72,15 +98,15 @@ public abstract class ExternalMediaStorageService {
     }
 
     @Transactional
-    public void updateFileMetadata(UUID userId, String fileId, AudioFileMetadata metadata) {
-        StoredFile storedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId)
+    public void updateFileMetadata(String fileId, AudioFileMetadata metadata) {
+        StoredFile storedFile = fileRepository.findByOwnerIdAndExternalId(securityUtils.getCurrentUserId(), fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
         storedFile.setMetadataJson(metadata);
         fileRepository.save(storedFile);
     }
 
     @Transactional
-    public AudioFileMetadata convertMetadata(AudioMetadataExtractionDto dto, UUID userId) {
+    public AudioFileMetadata convertMetadata(AudioMetadataExtractionDto dto) {
         // TODO srp
         AudioFileMetadata metadata = new AudioFileMetadata();
         metadata.setTitle(dto.getTitle());
@@ -90,12 +116,11 @@ public abstract class ExternalMediaStorageService {
         metadata.setYear(dto.getYear());
         metadata.setDuration(dto.getDuration());
 
-        ApplicationUser user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-
-        Artist artist = artistRepository.findByNameAndUserIdOrderByNameAsc(dto.getArtistName(), user.getId())
+        UUID userId = securityUtils.getCurrentUserId();
+        ApplicationUser userRef = userRepository.getReferenceById(userId);
+        Artist artist = artistRepository.findByNameAndUserIdOrderByNameAsc(dto.getArtistName(), userId)
                 .orElseGet(() -> {
-                    Artist newArtist = new Artist(dto.getArtistName(), user);
+                    Artist newArtist = new Artist(dto.getArtistName(), userRef);
                     return artistRepository.save(newArtist);
                 });
 
@@ -104,11 +129,11 @@ public abstract class ExternalMediaStorageService {
     }
 
     @Transactional
-    public FolderContentsDto getFolderContentsFromCache(UUID userId, String folderId) {
-        var folder = folderRepository.findByOwnerIdAndProviderAndExternalId(userId, getProvider(), folderId);
+    public Optional<FolderContentsDto> getFolderContentsFromCache(String folderId) {
+        var folder = folderRepository.findByOwnerIdAndProviderAndExternalId(securityUtils.getCurrentUserId(), getProvider(), folderId);
 
-        if (folder.isEmpty()) {
-            return new FolderContentsDto(List.of(), List.of());
+        if (folder.isEmpty() || (folder.get().getFiles().isEmpty() && folder.get().getFolders().isEmpty())) {
+            return Optional.empty();
         }
 
         List<FolderDto> folders = folder.get().getFolders().stream()
@@ -138,7 +163,7 @@ public abstract class ExternalMediaStorageService {
                 .sorted(Comparator.comparing(Song::name))
                 .collect(Collectors.toList());
 
-        return new FolderContentsDto(folders, songs);
+        return Optional.of(new FolderContentsDto(folders, songs));
     }
 
     protected boolean isPreviewUrlExpired(AudioFileMetadata metadata) {
@@ -167,7 +192,8 @@ public abstract class ExternalMediaStorageService {
     }
 
     @Transactional
-    protected void updateFolderContents(UUID userId, String folderId, FolderContentsDto contents) {
+    protected void updateFolderContents(String folderId, FolderContentsDto contents) {
+        UUID userId = securityUtils.getCurrentUserId();
         ApplicationUser currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 

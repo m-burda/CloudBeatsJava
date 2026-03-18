@@ -29,7 +29,6 @@ import java.util.Map;
 @RequestMapping("/api/user")
 public class AuthenticationController {
     private final AuthenticationManager authenticationManager;
-    private final AuthenticationService authenticationService;
     private final ApplicationUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -39,9 +38,8 @@ public class AuthenticationController {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
-    public AuthenticationController(AuthenticationManager authenticationManager, AuthenticationService authenticationService, ApplicationUserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthenticationController(AuthenticationManager authenticationManager, ApplicationUserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.authenticationManager = authenticationManager;
-        this.authenticationService = authenticationService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -83,11 +81,9 @@ public class AuthenticationController {
                 new UsernamePasswordAuthenticationToken(request.username, request.password)
         );
 
-        // 2. Set context for the current thread
         SecurityContext sc = SecurityContextHolder.getContext();
         sc.setAuthentication(auth);
 
-        // 3. Persist the context into the session (This sends the Cookie back to the browser)
         HttpSession session = servletRequest.getSession(true);
         session.setAttribute("SPRING_SECURITY_CONTEXT", sc);
 
@@ -98,7 +94,7 @@ public class AuthenticationController {
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
-        if (userRepository.findByUsername(request.username).isPresent()) {
+        if (userRepository.existsByUsername(request.username)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Username exists");
         }
 

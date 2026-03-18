@@ -3,25 +3,27 @@ package com.cloudbeats.services;
 import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.dto.Song;
+import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.repositories.FileRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class SongService {
     private final FileRepository fileRepository;
     private final FileManagementService fileManagementService;
+    private final SecurityUtils securityUtils;
 
-    public SongService(FileRepository fileRepository, FileManagementService fileManagementService) {
+    public SongService(FileRepository fileRepository, FileManagementService fileManagementService, SecurityUtils securityUtils) {
         this.fileRepository = fileRepository;
         this.fileManagementService = fileManagementService;
+        this.securityUtils = securityUtils;
     }
 
-    public List<Song> getAllSongs(UUID userId) {
-        return fileRepository.findByOwnerIdOrderByName(userId).stream()
+    public List<Song> getAllSongs() {
+        return fileRepository.findByOwnerIdOrderByName(securityUtils.getCurrentUserId()).stream()
                 .map(this::toSongDto).toList();
     }
 

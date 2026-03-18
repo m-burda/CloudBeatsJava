@@ -15,19 +15,16 @@ import java.util.List;
 @RequestMapping("/api/files")
 public class TracksController {
     private final SongService songService;
-    private final ApplicationUserService userService;
 
-    public TracksController(SongService songService, ApplicationUserService userService) {
+    public TracksController(SongService songService) {
         this.songService = songService;
-        this.userService = userService;
     }
 
     @GetMapping
     public ResponseEntity<List<Song>> getAllSongs(
             @AuthenticationPrincipal UserDetails principal
     ) {
-        ApplicationUser user = userService.findApplicationUserByUsername(principal.getUsername());
-        List<Song> songs = songService.getAllSongs(user.getId());
+        List<Song> songs = songService.getAllSongs();
         return ResponseEntity.ok(songs);
     }
 }
