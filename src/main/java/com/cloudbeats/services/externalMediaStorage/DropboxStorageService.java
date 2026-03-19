@@ -14,6 +14,7 @@ import com.dropbox.core.DbxException;
 import com.dropbox.core.DbxRequestConfig;
 import com.dropbox.core.oauth.DbxCredential;
 import com.dropbox.core.v2.DbxClientV2;
+import com.dropbox.core.v2.files.FileMetadata;
 import com.dropbox.core.v2.files.FolderMetadata;
 import com.dropbox.core.v2.files.ListFolderResult;
 import jakarta.transaction.Transactional;
@@ -98,17 +99,17 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             List<Song> songs = new ArrayList<>();
 
             folderData.getEntries().forEach(entry -> {
-                if (entry instanceof FolderMetadata) {
-                    folders.add(new FolderDto(entry.getName(), getProvider(), entry.getPathLower(), entry.getPathLower()));
-                } else {
-                    songs.add(new Song(entry.getName(), List.of(), getProvider(), entry.getPathLower(), entry.getPathLower(), entry.getPreviewUrl(), null, null));
+                if (entry instanceof FolderMetadata folder) {
+                    folders.add(new FolderDto(folder.getName(), getProvider(), folder.getPathLower(), folder.getId()));
+                } else if (entry instanceof FileMetadata file) {
+                    songs.add(new Song(file.getName(), List.of(), getProvider(), file.getPathLower(), file.getId(), file.getPreviewUrl(), null, null));
                 }
             });
 
             FolderContentsDto contents = new FolderContentsDto(folders, songs);
             updateFolderContents(folderId, contents);
 
-            return contents;
+            return enrichWithCachedMetadata(folderId, contents);
 
         } catch (DbxException e) {
             throw new IllegalArgumentException("Failed to list Dropbox files: " + e.getMessage());

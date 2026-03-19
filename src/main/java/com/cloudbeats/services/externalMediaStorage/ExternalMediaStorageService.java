@@ -163,6 +163,44 @@ public abstract class ExternalMediaStorageService {
         return Optional.of(new FolderContentsDto(folders, songs));
     }
 
+    @Transactional
+    protected FolderContentsDto enrichWithCachedMetadata(String folderId, FolderContentsDto contents) {
+        UUID userId = securityUtils.getCurrentUserId();
+        String normalizedFolderId = folderId.equals("/") ? "" : folderId;
+
+        var storedFolder = folderRepository.findByOwnerIdAndProviderAndExternalId(userId, getProvider(), normalizedFolderId);
+        if (storedFolder.isEmpty()) {
+            return contents;
+        }
+
+        Map<String, StoredFile> localFilesById = storedFolder.get().getFiles().stream()
+                .collect(Collectors.toMap(StoredFile::getExternalId, f -> f));
+
+        List<Song> enriched = contents.files().stream()
+                .map(song -> {
+                    StoredFile local = localFilesById.get(song.id());
+                    if (local == null || local.getMetadataJson() == null) {
+                        return song;
+                    }
+                    AudioFileMetadata metadata = local.getMetadataJson();
+                    return new Song(
+                            song.name(),
+                            metadata.getAlbumArtists() != null
+                                    ? metadata.getAlbumArtists().stream().map(Artist::getName).toList()
+                                    : List.of(),
+                            song.provider(),
+                            song.path(),
+                            song.id(),
+                            metadata.getPreviewUrl(),
+                            metadata.getAlbumCoverUrl(),
+                            metadata
+                    );
+                })
+                .collect(Collectors.toList());
+
+        return new FolderContentsDto(contents.folders(), enriched);
+    }
+
     protected boolean isPreviewUrlExpired(AudioFileMetadata metadata) {
         if (metadata == null || metadata.getPreviewUrl() == null || metadata.getLastModified() == null) {
             return true;
@@ -207,32 +245,50 @@ public abstract class ExternalMediaStorageService {
             return folder;
         });
 
-        parentFolder.getFolders().clear();
-        parentFolder.getFiles().clear();
         parentFolder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
 
+        Set<String> remoteFolderIds = contents.folders().stream()
+                .map(FolderDto::id)
+                .collect(Collectors.toSet());
+        parentFolder.getFolders().removeIf(f -> !remoteFolderIds.contains(f.getExternalId()));
+
+        Set<String> localFolderIds = parentFolder.getFolders().stream()
+                .map(StoredFolder::getExternalId)
+                .collect(Collectors.toSet());
         for (FolderDto folderDto : contents.folders()) {
-            var folder = new StoredFolder();
-            folder.setExternalId(folderDto.path());
-            folder.setProvider(getProvider());
-            folder.setOwner(currentUser);
-            folder.setName(folderDto.name());
-            folder.setParent(parentFolder);
-            folder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
-            parentFolder.getFolders().add(folder);
+            if (!localFolderIds.contains(folderDto.id())) {
+                var folder = new StoredFolder();
+                folder.setExternalId(folderDto.id());
+                folder.setProvider(getProvider());
+                folder.setOwner(currentUser);
+                folder.setName(folderDto.name());
+                folder.setParent(parentFolder);
+                folder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
+                parentFolder.getFolders().add(folder);
+            }
         }
 
+        Set<String> remoteFileIds = contents.files().stream()
+                .map(Song::id)
+                .collect(Collectors.toSet());
+        parentFolder.getFiles().removeIf(f -> !remoteFileIds.contains(f.getExternalId()));
+
+        Set<String> localFileIds = parentFolder.getFiles().stream()
+                .map(StoredFile::getExternalId)
+                .collect(Collectors.toSet());
         for (Song song : contents.files()) {
-            var file = new StoredFile();
-            file.setExternalId(song.path());
-            file.setProvider(getProvider());
-            file.setOwner(currentUser);
-            file.setName(song.name());
-            file.setFolder(parentFolder);
-            file.setLastModified(OffsetDateTime.now(ZoneOffset.UTC));
-            file.setType(FileType.AUDIO);
-            file.setMetadataJson(song.metadata());
-            parentFolder.getFiles().add(file);
+            if (!localFileIds.contains(song.id())) {
+                var file = new StoredFile();
+                file.setExternalId(song.id());
+                file.setProvider(getProvider());
+                file.setOwner(currentUser);
+                file.setName(song.name());
+                file.setFolder(parentFolder);
+                file.setLastModified(OffsetDateTime.now(ZoneOffset.UTC));
+                file.setType(FileType.AUDIO);
+                file.setMetadataJson(song.metadata());
+                parentFolder.getFiles().add(file);
+            }
         }
 
         folderRepository.save(parentFolder);

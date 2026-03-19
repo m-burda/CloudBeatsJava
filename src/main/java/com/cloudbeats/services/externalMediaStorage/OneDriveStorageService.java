@@ -150,7 +150,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
         FolderContentsDto contents = new FolderContentsDto(folders, songs);
         updateFolderContents(folderId, contents);
 
-        return contents;
+        return enrichWithCachedMetadata(folderId, contents);
     }
 
     @Override
