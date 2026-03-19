@@ -27,6 +27,9 @@ public class StoredFolder {
     @Column(nullable = false)
     private String name;
 
+    @Column
+    private String path;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
             @JoinColumn(name = "parent_provider", referencedColumnName = "provider"),
@@ -62,6 +65,10 @@ public class StoredFolder {
 
     public String getName() {
         return name;
+    }
+
+    public String getPath() {
+        return path;
     }
 
     public Provider getProvider() {
@@ -106,6 +113,10 @@ public class StoredFolder {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 
     public void setLastSynced(OffsetDateTime lastSynced) {

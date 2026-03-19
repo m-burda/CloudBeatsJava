@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS public.stored_folders
     last_synced timestamp(6) with time zone,
     last_modified timestamp(6) with time zone,
     name character varying(255) COLLATE pg_catalog."default" NOT NULL,
+    path character varying(1024) COLLATE pg_catalog."default",
     owner_id uuid NOT NULL,
     parent_external_id character varying(255) COLLATE pg_catalog."default",
     parent_provider character varying(255) COLLATE pg_catalog."default",

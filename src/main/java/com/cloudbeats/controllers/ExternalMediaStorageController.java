@@ -23,11 +23,11 @@ public class ExternalMediaStorageController {
     @GetMapping("/{provider}/files/list")
     public ResponseEntity<FolderContentsDto> listFiles(
         @PathVariable Provider provider,
-        @RequestParam(defaultValue = "") String path,
+        @RequestParam(defaultValue = "root") String id,
         @RequestParam(defaultValue = "true") boolean cached
     ) {
         ExternalMediaStorageService storageService = storageFactory.getService(provider);
-        FolderContentsDto contents = storageService.listFiles(path, cached);
+        FolderContentsDto contents = storageService.listFiles(id, cached);
 
         return ResponseEntity.ok(contents);
     }

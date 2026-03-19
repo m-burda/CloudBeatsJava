@@ -76,6 +76,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
         return new GraphServiceClient(credential, scopes);
     }
 
+    @Deprecated
     private void refreshAccessToken(MediaStorageAccount account) {
         try {
             ConfidentialClientApplication app = ConfidentialClientApplication.builder(
@@ -120,8 +121,8 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
 
         GraphServiceClient graphClient = getGraphClient();
 
-        var childrenResponse = graphClient.drives().byDriveId("me").items().byDriveItemId("root").children().get(config -> {
-            config.queryParameters.select = new String[]{"id", "name", "folder", "audio", "file"};
+        var childrenResponse = graphClient.drives().byDriveId("me").items().byDriveItemId(folderId).children().get(config -> {
+            config.queryParameters.select = new String[]{"id", "name", "folder", "audio", "file", "parentReference"};
         });
 
         List<DriveItem> items = childrenResponse != null && childrenResponse.getValue() != null
@@ -142,7 +143,15 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 )
                 .forEach(item -> {
                     if (item.getFolder() != null) {
-                        folders.add(new FolderDto(item.getName(), getProvider(), item.getId(), item.getId()));
+                        String parentPath = (item.getParentReference() != null && item.getParentReference().getPath() != null)
+                                ? item.getParentReference().getPath()
+                                : "";
+                        // parentReference.path looks like "/drives/<driveId>/root:/Music" — strip the drive prefix
+                        String cleanParent = parentPath.contains(":")
+                                ? parentPath.substring(parentPath.indexOf(':') + 1)
+                                : parentPath;
+                        String folderPath = cleanParent.isEmpty() ? "/" + item.getName() : cleanParent + "/" + item.getName();
+                        folders.add(new FolderDto(item.getName(), getProvider(), folderPath, item.getId()));
                     } else {
                         OffsetDateTime lastModified = item.getLastModifiedDateTime();
                         songs.add(new Song(item.getName(), List.of(), getProvider(), item.getId(), item.getId(), null, null, lastModified, null));

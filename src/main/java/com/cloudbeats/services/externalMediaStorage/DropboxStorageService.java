@@ -1,6 +1,7 @@
 package com.cloudbeats.services.externalMediaStorage;
 
 import com.cloudbeats.config.DropboxClientProperties;
+import com.cloudbeats.db.entities.StoredFolder;
 import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;
@@ -88,12 +89,11 @@ public class DropboxStorageService extends ExternalMediaStorageService {
 
         DbxClientV2 client = getDbxClient();
 
-        try {
-            // Dropbox uses "" for the root folder instead of "/"
-            String path = folderId.equals("/") ? "" : folderId;
+        StoredFolder parentFolder = getOrCreateFolder(securityUtils.getCurrentUserId(), folderId);
 
+        try {
             ListFolderResult folderData = client.files()
-                    .listFolderBuilder(path)
+                    .listFolderBuilder(parentFolder.getPath() == null ? "" : parentFolder.getPath())
                     .withIncludeMediaInfo(true)
                     .start();
 

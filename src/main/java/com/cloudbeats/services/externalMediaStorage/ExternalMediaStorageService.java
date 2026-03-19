@@ -137,7 +137,7 @@ public abstract class ExternalMediaStorageService {
                 .map(f -> new FolderDto(
                         f.getName(),
                         getProvider(),
-                        f.getExternalId(),
+                        f.getPath(),
                         f.getExternalId()
                 ))
                 .sorted(Comparator.comparing(FolderDto::name))
@@ -228,24 +228,25 @@ public abstract class ExternalMediaStorageService {
         }
     }
 
+    protected StoredFolder getOrCreateFolder(UUID userId, String folderId) {
+        return folderRepository.findByOwnerIdAndProviderAndExternalId(userId, getProvider(), folderId)
+                .orElseGet(() -> {
+                    var folder = new StoredFolder();
+                    folder.setExternalId(folderId);
+                    folder.setProvider(getProvider());
+                    folder.setOwner(userRepository.getReferenceById(userId));
+                    folder.setName(folderId.isEmpty() ? "root" : folderId);
+                    folder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
+                    return folderRepository.save(folder);
+                });
+    }
+
     @Transactional
     protected void updateFolderContents(String folderId, FolderContentsDto contents) {
         UUID userId = securityUtils.getCurrentUserId();
-        ApplicationUser currentUser = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        ApplicationUser currentUser = userRepository.getReferenceById(userId);
 
-        String normalizedFolderId = folderId.equals("/") ? "" : folderId;
-        var parentFolder = folderRepository.findByOwnerIdAndProviderAndExternalId(
-                userId, getProvider(), normalizedFolderId
-        ).orElseGet(() -> {
-            var folder = new StoredFolder();
-            folder.setExternalId(normalizedFolderId);
-            folder.setProvider(getProvider());
-            folder.setOwner(currentUser);
-            folder.setName(normalizedFolderId.isEmpty() ? "root" : normalizedFolderId);
-            folder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
-            return folder;
-        });
+        var parentFolder = getOrCreateFolder(userId, folderId);
 
         parentFolder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
 
@@ -264,9 +265,17 @@ public abstract class ExternalMediaStorageService {
                 folder.setProvider(getProvider());
                 folder.setOwner(currentUser);
                 folder.setName(folderDto.name());
+                folder.setPath(folderDto.path());
                 folder.setParent(parentFolder);
                 folder.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
                 parentFolder.getFolders().add(folder);
+            } else {
+                // TODO verify
+                // Update path in case it changed (e.g. folder renamed on the provider side)
+                parentFolder.getFolders().stream()
+                        .filter(f -> f.getExternalId().equals(folderDto.id()))
+                        .findFirst()
+                        .ifPresent(f -> f.setPath(folderDto.path()));
             }
         }
 
