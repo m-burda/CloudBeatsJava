@@ -3,6 +3,7 @@ package com.cloudbeats.dto;
 import com.cloudbeats.db.entities.AudioFileMetadata;
 import com.cloudbeats.models.Provider;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public record Song (
@@ -13,5 +14,6 @@ public record Song (
         String id,
         String previewUrl,
         String albumCoverUrl,
+        OffsetDateTime lastModified,
         AudioFileMetadata metadata
 ){}

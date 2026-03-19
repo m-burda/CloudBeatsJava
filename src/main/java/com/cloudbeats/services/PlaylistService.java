@@ -133,6 +133,7 @@ public class PlaylistService {
                 file.getExternalId(),
                 previewUrl,
                 metadata == null ? null : metadata.getAlbumCoverUrl(),
+                file.getLastModified(),
                 metadata
         );
     }

@@ -44,6 +44,7 @@ public class SongService {
                 file.getExternalId(),
                 previewUrl,
                 albumCoverUrl,
+                file.getLastModified(),
                 metadata
         );
     }

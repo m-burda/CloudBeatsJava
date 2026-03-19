@@ -22,6 +22,8 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Service
@@ -102,7 +104,10 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 if (entry instanceof FolderMetadata folder) {
                     folders.add(new FolderDto(folder.getName(), getProvider(), folder.getPathLower(), folder.getId()));
                 } else if (entry instanceof FileMetadata file) {
-                    songs.add(new Song(file.getName(), List.of(), getProvider(), file.getPathLower(), file.getId(), file.getPreviewUrl(), null, null));
+                    OffsetDateTime serverModified = file.getServerModified() != null
+                            ? file.getServerModified().toInstant().atOffset(ZoneOffset.UTC)
+                            : null;
+                    songs.add(new Song(file.getName(), List.of(), getProvider(), file.getPathLower(), file.getId(), file.getPreviewUrl(), null, serverModified, null));
                 }
             });
 

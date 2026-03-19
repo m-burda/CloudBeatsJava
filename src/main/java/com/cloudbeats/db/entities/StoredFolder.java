@@ -3,6 +3,7 @@ package com.cloudbeats.db.entities;
 import com.cloudbeats.models.Provider;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,8 +37,17 @@ public class StoredFolder {
     @Column(name = "last_synced")
     private OffsetDateTime lastSynced;
 
+    @Column(name = "last_modified")
+    private OffsetDateTime lastModified;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
+
+    @PrePersist
+    @PreUpdate
+    private void touchLastModified() {
+        this.lastModified = OffsetDateTime.now(ZoneOffset.UTC);
+    }
 
     // Navigation properties
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -72,6 +82,10 @@ public class StoredFolder {
 
     public OffsetDateTime getLastSynced() {
         return lastSynced;
+    }
+
+    public OffsetDateTime getLastModified() {
+        return lastModified;
     }
 
     public OffsetDateTime getCreatedAt() {

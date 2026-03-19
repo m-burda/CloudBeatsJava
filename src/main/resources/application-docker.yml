@@ -1,8 +1,6 @@
 spring:
   application:
     name: CloudBeats
-  profiles:
-    active: docker
 
   security:
     user:
@@ -81,9 +79,9 @@ server:
 
 logging:
   level:
-    org.springframework.security: INFO
-    org.springframework.web: INFO
-    org.hibernate: INFO
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate: DEBUG
 
 jwt:
   secret: mysecretkey
@@ -93,6 +91,15 @@ jwt:
 cloudbeats:
   storage:
     artwork: artworks
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
 
 minio:
   url: http://minio:9000

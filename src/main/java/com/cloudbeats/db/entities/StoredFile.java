@@ -37,6 +37,9 @@ public class StoredFile {
     @Column(name = "last_synced")
     private OffsetDateTime lastSynced;
 
+    @Column(name = "last_modified")
+    private OffsetDateTime lastModified;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
@@ -80,7 +83,19 @@ public class StoredFile {
     }
 
     public void setLastModified(OffsetDateTime lastModified) {
-        this.lastSynced = lastModified;
+        this.lastModified = lastModified;
+    }
+
+    public void setLastSynced(OffsetDateTime lastSynced) {
+        this.lastSynced = lastSynced;
+    }
+
+    public OffsetDateTime getLastModified() {
+        return lastModified;
+    }
+
+    public OffsetDateTime getLastSynced() {
+        return lastSynced;
     }
 
     public StoredFolder getFolder() {

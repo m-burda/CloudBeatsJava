@@ -49,7 +49,6 @@ public class AuthenticationController {
         private String password;
         private String email;
 
-        // Getters and setters
         public String getUserName() {
             return userName;
         }
@@ -95,7 +94,7 @@ public class AuthenticationController {
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
         if (userRepository.existsByUsername(request.username)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Username exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("User already exists");
         }
 
         ApplicationUser user = new ApplicationUser();
@@ -140,7 +139,7 @@ public class AuthenticationController {
             session.invalidate();
         }
         SecurityContextHolder.clearContext();
-        return ResponseEntity.ok("Logout successful");
+        return ResponseEntity.ok("Logged out");
     }
 
 }

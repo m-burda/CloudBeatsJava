@@ -148,12 +148,13 @@ public abstract class ExternalMediaStorageService {
                     var metadata = entry.getMetadataJson();
                     return new Song(
                             entry.getName(),
-                            metadata != null ? metadata.getAlbumArtists().stream().map(Artist::getName).toList() : List.of(),
+                            metadata != null ? metadata.getAlbumArtists().stream().map(Artist::getName).toList() : List.<String>of(),
                             getProvider(),
                             entry.getExternalId(),
                             entry.getExternalId(),
                             metadata != null ? metadata.getPreviewUrl() : "",
                             metadata != null ? metadata.getAlbumCoverUrl() : null,
+                            entry.getLastModified(),
                             metadata
                     );
                 })
@@ -187,12 +188,13 @@ public abstract class ExternalMediaStorageService {
                             song.name(),
                             metadata.getAlbumArtists() != null
                                     ? metadata.getAlbumArtists().stream().map(Artist::getName).toList()
-                                    : List.of(),
+                                    : List.<String>of(),
                             song.provider(),
                             song.path(),
                             song.id(),
                             metadata.getPreviewUrl(),
                             metadata.getAlbumCoverUrl(),
+                            song.lastModified(),
                             metadata
                     );
                 })
@@ -284,7 +286,8 @@ public abstract class ExternalMediaStorageService {
                 file.setOwner(currentUser);
                 file.setName(song.name());
                 file.setFolder(parentFolder);
-                file.setLastModified(OffsetDateTime.now(ZoneOffset.UTC));
+                file.setLastModified(song.lastModified() != null ? song.lastModified() : OffsetDateTime.now(ZoneOffset.UTC));
+                file.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
                 file.setType(FileType.AUDIO);
                 file.setMetadataJson(song.metadata());
                 parentFolder.getFiles().add(file);

@@ -2,12 +2,10 @@ version: '3.8'
 
 services:
   postgres:
+    env_file:
+      - .env.docker
     image: postgres:16-alpine
     container_name: cloudbeats-postgres
-    environment:
-      POSTGRES_DB: cloudbeats
-      POSTGRES_USER: cloudbeats
-      POSTGRES_PASSWORD: cloudbeats_password
     ports:
       - "5433:5432"
     volumes:
@@ -24,9 +22,8 @@ services:
   minio:
     image: minio/minio:latest
     container_name: cloudbeats-minio
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+    env_file:
+      - .env.docker
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -50,36 +47,32 @@ services:
     entrypoint: >
       /bin/sh -c "
       /usr/bin/mc alias set minio http://minio:9000 minioadmin minioadmin;
-      /usr/bin/mc mb minio/cloudbeats --ignore-existing;
-      /usr/bin/mc version enable minio/cloudbeats;
+      /usr/bin/mc mb cloudbeats-docker --ignore-existing;
+      /usr/bin/mc version enable cloudbeats-docker;
       exit 0;
       "
     networks:
       - cloudbeats-network
 
   app:
+    env_file:
+      - .env.docker
     build:
       context: .
       dockerfile: Dockerfile
     container_name: cloudbeats-app
+    environment:
+      STORAGE_MINIO_ENDPOINT: http://minio:9000
+      STORAGE_MINIO_BUCKET_NAME: cloudbeats-docker
     depends_on:
       postgres:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      DROPBOX_CLIENT_ID: ${DROPBOX_CLIENT_ID}
-      DROPBOX_CLIENT_SECRET: ${DROPBOX_CLIENT_SECRET}
-      ONEDRIVE_CLIENT_ID: ${ONEDRIVE_CLIENT_ID}
-      ONEDRIVE_CLIENT_SECRET: ${ONEDRIVE_CLIENT_SECRET}
     ports:
       - "8080:8080"
     networks:
       - cloudbeats-network
-    restart: unless-stopped
 
 volumes:
   postgres_data:
@@ -88,6 +81,3 @@ volumes:
 networks:
   cloudbeats-network:
     driver: bridge
-
-
-

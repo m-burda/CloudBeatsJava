@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
@@ -143,7 +144,8 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                     if (item.getFolder() != null) {
                         folders.add(new FolderDto(item.getName(), getProvider(), item.getId(), item.getId()));
                     } else {
-                        songs.add(new Song(item.getName(), List.of(), getProvider(), item.getId(), item.getId(), null, null, null));
+                        OffsetDateTime lastModified = item.getLastModifiedDateTime();
+                        songs.add(new Song(item.getName(), List.of(), getProvider(), item.getId(), item.getId(), null, null, lastModified, null));
                     }
                 });
 
