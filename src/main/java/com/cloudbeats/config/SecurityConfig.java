@@ -1,9 +1,6 @@
 package com.cloudbeats.config;
 
-import com.cloudbeats.models.Provider;
-import com.cloudbeats.services.ApplicationUserService;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,12 +13,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.*;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.List;
 
 @Configuration
 public class SecurityConfig {
+    private final RequestCache frontendRedirectRequestCache;
+
+    public SecurityConfig(RequestCache frontendRedirectRequestCache) {
+        this.frontendRedirectRequestCache = frontendRedirectRequestCache;
+    }
+
     @Bean
     public OAuth2AuthorizedClientService authorizedClientService(
             JdbcTemplate jdbcTemplate,
@@ -65,7 +69,10 @@ public class SecurityConfig {
                     config.setAllowCredentials(true);
                     return config;
                 }))
-                .oauth2Client(Customizer.withDefaults());
+                .oauth2Client(Customizer.withDefaults())
+                .requestCache(cache -> cache
+                        .requestCache(frontendRedirectRequestCache)
+                );
         return http.build();
     }
 
