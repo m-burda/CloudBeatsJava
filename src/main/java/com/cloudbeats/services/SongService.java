@@ -27,6 +27,11 @@ public class SongService {
                 .map(this::toSongDto).toList();
     }
 
+    public List<Song> searchSongs(String query) {
+        return fileRepository.fullTextSearch(securityUtils.getCurrentUserId(), query).stream()
+                .map(this::toSongDto).toList();
+    }
+
     private Song toSongDto(StoredFile file) {
         var metadata = file.getMetadataJson();
 

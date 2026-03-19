@@ -19,6 +19,17 @@ public interface FileRepository extends CrudRepository<StoredFile, UUID> {
 
     List<StoredFile> findByOwnerIdOrderByName(UUID ownerId);
 
+    @Query(value = """
+    SELECT sf.* FROM stored_files sf
+    WHERE sf.owner_id = :ownerId
+      AND sf.search_text ILIKE %:query%
+    ORDER BY
+      similarity(:query, sf.search_text) DESC,
+      sf.name ASC
+    LIMIT 50
+    """, nativeQuery = true)
+    List<StoredFile> fullTextSearch(@Param("ownerId") UUID ownerId, @Param("query") String query);
+
     void deleteAllByOwnerId(UUID ownerId);
 
     @Modifying
