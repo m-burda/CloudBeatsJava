@@ -16,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.*;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.List;
@@ -37,7 +38,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JdbcOAuth2AuthorizedClientService oauth2ClientService
+            JdbcOAuth2AuthorizedClientService oauth2ClientService,
+            RequestCache frontendRedirectRequestCache
     ) throws Exception {
         http
             .exceptionHandling(exception -> exception
@@ -65,6 +67,7 @@ public class SecurityConfig {
                     config.setAllowCredentials(true);
                     return config;
                 }))
+                .requestCache(cache -> cache.requestCache(frontendRedirectRequestCache))
                 .oauth2Client(Customizer.withDefaults());
         return http.build();
     }
