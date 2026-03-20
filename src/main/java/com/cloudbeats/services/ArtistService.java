@@ -4,7 +4,6 @@ import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.repositories.ArtistRepository;
 import com.cloudbeats.repositories.FileRepository;
 import com.cloudbeats.dto.ArtistDto;
-import com.cloudbeats.db.entities.StoredFile;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -34,17 +33,14 @@ public class ArtistService {
         // TODO n+1
         return artistRepository.findByUserId(userId).stream()
                 .map(artist -> {
-                    // Find the first stored file with metadata containing this artist
                     var files = fileRepository.findByOwnerIdOrderByName(userId);
                     String albumCoverUrl = files.stream()
-                            .filter(file -> file.getMetadataJson() != null
-                                    && file.getMetadataJson().getAlbumArtists() != null
-                                    && file.getMetadataJson().getAlbumArtists().stream()
+                            .filter(file -> file.getMetadata() != null
+                                    && file.getMetadata().getArtists().stream()
                                     .anyMatch(a -> a.getName().equals(artist.getName())))
                             .findFirst()
-                            .map(StoredFile::getMetadataJson)
-                            .map(f -> fileManagementService.generateAccessUrlIfExpired(
-                                    f.getAlbumCoverUrl(),
+                            .map(file -> fileManagementService.generateAccessUrlIfExpired(
+                                    file.getMetadata().getAlbumCoverUrl(),
                                     Duration.ofDays(7)
                             ))
                             .orElse(null);

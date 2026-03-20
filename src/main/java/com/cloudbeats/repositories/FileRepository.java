@@ -30,7 +30,30 @@ public interface FileRepository extends CrudRepository<StoredFile, UUID> {
     """, nativeQuery = true)
     List<StoredFile> fullTextSearch(@Param("ownerId") UUID ownerId, @Param("query") String query);
 
-    void deleteAllByOwnerId(UUID ownerId);
+    @Query(value = """
+    SELECT sf.* FROM stored_files sf
+    INNER JOIN stored_file_artists sfa ON sfa.file_external_id = sf.external_id AND sfa.file_provider = sf.provider
+    INNER JOIN artists a ON a.id = sfa.artist_id
+    WHERE sf.owner_id = :ownerId
+      AND sf.search_text ILIKE %:query%
+      AND lower(a.name) = lower(:artist)
+    ORDER BY
+      similarity(:query, sf.search_text) DESC,
+      sf.name ASC
+    LIMIT 50
+    """, nativeQuery = true)
+    List<StoredFile> fullTextSearchByArtist(@Param("ownerId") UUID ownerId, @Param("query") String query, @Param("artist") String artist);
+
+    @Query(value = """
+    SELECT sf.* FROM stored_files sf
+    INNER JOIN stored_file_metadata sm ON sm.id = sf.metadata_id
+    INNER JOIN stored_file_metadata_artists sfma ON sfma.metadata_id = sm.id
+    INNER JOIN artists a ON a.id = sfma.artist_id
+    WHERE sf.owner_id = :ownerId
+      AND a.name = :artist
+    ORDER BY sf.name ASC
+    """, nativeQuery = true)
+    List<StoredFile> findByArtist(@Param("ownerId") UUID ownerId, @Param("artist") String artist);
 
     @Modifying
     @Transactional

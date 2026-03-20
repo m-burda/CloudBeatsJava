@@ -1,30 +1,34 @@
 package com.cloudbeats.db.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+import java.util.UUID;
 
 @Entity
+@Table(name = "albums", uniqueConstraints = {
+        @UniqueConstraint(name = "uniq_album_per_user", columnNames = {"name", "user_id"})
+})
 public class Album {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
+    @Column(nullable = false)
     private String name;
 
-    // Getters and setters
-    public Long getId() {
-        return id;
-    }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private ApplicationUser user;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public UUID getId()                        { return id; }
 
-    public String getName() {
-        return name;
-    }
+    public String getName()                    { return name; }
+    public void   setName(String name)         { this.name = name; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    public ApplicationUser getUser()           { return user; }
+    public void setUser(ApplicationUser user)  { this.user = user; }
 }

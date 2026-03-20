@@ -1,6 +1,5 @@
 package com.cloudbeats.dto;
 
-import com.cloudbeats.db.entities.AudioFileMetadata;
 import com.cloudbeats.models.Provider;
 
 import java.time.OffsetDateTime;
@@ -16,6 +15,5 @@ public record FileDto(
         String id,
         String previewUrl,
         OffsetDateTime lastModified,
-        AudioFileMetadata metadata
+        AudioFileMetadataDto metadata
 ) {}
-

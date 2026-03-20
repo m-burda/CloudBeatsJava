@@ -4,6 +4,7 @@ import com.azure.core.credential.AccessToken;
 import com.azure.core.credential.TokenCredential;
 import com.cloudbeats.config.OneDriveClientProperties;
 import com.cloudbeats.db.entities.MediaStorageAccount;
+import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.dto.*;
 import com.cloudbeats.repositories.*;
 import com.cloudbeats.services.SongService;
@@ -45,6 +46,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             FileManagementService fileManagementService,
             OAuth2AuthorizedClientManager authorizedClientManager,
             SecurityUtils securityUtils,
+            AlbumRepository albumRepository,
             SongService songService
     ) {
         super(
@@ -52,6 +54,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 folderRepository,
                 fileRepository,
                 artistRepository,
+                albumRepository,
                 fileManagementService,
                 authorizedClientManager,
                 securityUtils,
@@ -194,12 +197,13 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 tempFile = renamedFile;
             }
 
+            StoredFile sf = fileRepository.findByOwnerIdAndExternalId(securityUtils.getCurrentUserId(), fileId)
+                    .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
             var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
-            var metadata = convertMetadata(extractedDto);
-            metadata.setPreviewUrl(getFilePreviewUrl(fileId));
-            updateFileMetadata(fileId, metadata);
+            updateFileMetadata(fileId, extractedDto);
+            sf.setPreviewUrl(getFilePreviewUrl(fileId));
 
-            return toAudioFileMetadataDto(metadata);
+            return toAudioFileMetadataDto(sf);
         } catch (Exception e) {
             throw new RuntimeException("Metadata extraction failed for OneDrive file", e);
         }

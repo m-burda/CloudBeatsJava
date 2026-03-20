@@ -1,6 +1,7 @@
 package com.cloudbeats.services.externalMediaStorage;
 
 import com.cloudbeats.config.DropboxClientProperties;
+import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.db.entities.StoredFolder;
 import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FileDto;
@@ -41,15 +42,18 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             DropboxClientProperties clientProperties,
             AudioProcessingService audioProcessingService,
             ArtistRepository artistRepository,
+            AlbumRepository albumRepository,
             FileManagementService fileManagementService,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            SecurityUtils securityUtils, SongService songService
+            SecurityUtils securityUtils,
+            SongService songService
     ) {
         super(
                 userRepository,
                 folderRepository,
                 fileRepository,
                 artistRepository,
+                albumRepository,
                 fileManagementService,
                 authorizedClientManager,
                 securityUtils,
@@ -160,15 +164,13 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 tempFile = renamedFile;
             }
 
+            StoredFile sf = fileRepository.findByOwnerIdAndExternalId(securityUtils.getCurrentUserId(), fileId)
+                    .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
             var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
-            var metadata = convertMetadata(extractedDto);
+            sf.setPreviewUrl(getFilePreviewUrl(fileId));
+            updateFileMetadata(fileId, extractedDto);
 
-            // TODO extract this to a separate method. Better to cache separately
-            String previewUrl = getFilePreviewUrl(fileId);
-            metadata.setPreviewUrl(previewUrl);
-            updateFileMetadata(fileId, metadata);
-
-            return toAudioFileMetadataDto(metadata);
+            return toAudioFileMetadataDto(sf);
 
         } catch (Exception e) {
             throw new RuntimeException("Metadata extraction failed", e);

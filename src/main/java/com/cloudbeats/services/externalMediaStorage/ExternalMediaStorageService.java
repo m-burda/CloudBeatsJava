@@ -1,10 +1,6 @@
 package com.cloudbeats.services.externalMediaStorage;
 
-import com.cloudbeats.db.entities.ApplicationUser;
-import com.cloudbeats.db.entities.Artist;
-import com.cloudbeats.db.entities.AudioFileMetadata;
-import com.cloudbeats.db.entities.StoredFile;
-import com.cloudbeats.db.entities.StoredFolder;
+import com.cloudbeats.db.entities.*;
 import com.cloudbeats.dto.AudioMetadataExtractionDto;
 import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FileDto;
@@ -35,6 +31,7 @@ public abstract class ExternalMediaStorageService {
     protected final FolderRepository folderRepository;
     protected final FileRepository fileRepository;
     protected final ArtistRepository artistRepository;
+    protected final AlbumRepository albumRepository;
     protected final FileManagementService fileManagementService;
     protected static final Duration PREVIEW_URL_EXPIRE_DURATION = Duration.ofMinutes(10);
     protected final OAuth2AuthorizedClientManager authorizedClientManager;
@@ -46,6 +43,7 @@ public abstract class ExternalMediaStorageService {
             FolderRepository folderRepository,
             FileRepository fileRepository,
             ArtistRepository artistRepository,
+            AlbumRepository albumRepository,
             FileManagementService fileManagementService,
             OAuth2AuthorizedClientManager authorizedClientManager,
             SecurityUtils securityUtils,
@@ -55,6 +53,7 @@ public abstract class ExternalMediaStorageService {
         this.folderRepository = folderRepository;
         this.fileRepository = fileRepository;
         this.artistRepository = artistRepository;
+        this.albumRepository = albumRepository;
         this.fileManagementService = fileManagementService;
         this.authorizedClientManager = authorizedClientManager;
         this.securityUtils = securityUtils;
@@ -82,15 +81,14 @@ public abstract class ExternalMediaStorageService {
         UUID userId = securityUtils.getCurrentUserId();
         Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
 
-        if (cachedFile.isPresent() && cachedFile.get().getMetadataJson() != null) {
-            AudioFileMetadata cachedMetadata = cachedFile.get().getMetadataJson();
-            AudioFileMetadataDto dto = toAudioFileMetadataDto(cachedMetadata);
+        if (cachedFile.isPresent() && cachedFile.get().getMetadata() != null) {
+            StoredFile sf = cachedFile.get();
+            AudioFileMetadataDto dto = toAudioFileMetadataDto(sf);
 
-            // TODO side effect
-            if (isPreviewUrlExpired(cachedMetadata)) {
+            if (isPreviewUrlExpired(sf)) {
                 String previewUrl = getFilePreviewUrl(fileId);
-                cachedMetadata.setPreviewUrl(previewUrl);
-                updateFileMetadata(fileId, cachedMetadata);
+                sf.setPreviewUrl(previewUrl);
+                fileRepository.save(sf);
             }
 
             return Optional.of(dto);
@@ -99,34 +97,50 @@ public abstract class ExternalMediaStorageService {
     }
 
     @Transactional
-    public void updateFileMetadata(String fileId, AudioFileMetadata metadata) {
-        StoredFile storedFile = fileRepository.findByOwnerIdAndExternalId(securityUtils.getCurrentUserId(), fileId)
+    public void updateFileMetadata(String fileId, AudioMetadataExtractionDto dto) {
+        UUID userId = securityUtils.getCurrentUserId();
+        StoredFile sf = fileRepository.findByOwnerIdAndExternalId(userId, fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
-        storedFile.setMetadataJson(metadata);
-        fileRepository.save(storedFile);
+        applyMetadataToFile(sf, dto, userId);
+         fileRepository.save(sf);
     }
 
-    @Transactional
-    public AudioFileMetadata convertMetadata(AudioMetadataExtractionDto dto) {
-        // TODO srp
-        AudioFileMetadata metadata = new AudioFileMetadata();
-        metadata.setTitle(dto.getTitle());
-        metadata.setAlbum(dto.getAlbum());
-        metadata.setAlbumCoverUrl(dto.getAlbumCoverUrl());
-        metadata.setGenres(dto.getGenres());
-        metadata.setYear(dto.getYear());
-        metadata.setDuration(dto.getDuration());
-
-        UUID userId = securityUtils.getCurrentUserId();
+    private void applyMetadataToFile(StoredFile sf, AudioMetadataExtractionDto dto, UUID userId) {
         ApplicationUser userRef = userRepository.getReferenceById(userId);
-        Artist artist = artistRepository.findByNameAndUserIdOrderByNameAsc(dto.getArtistName(), userId)
-                .orElseGet(() -> {
-                    Artist newArtist = new Artist(dto.getArtistName(), userRef);
-                    return artistRepository.save(newArtist);
-                });
 
-        metadata.setAlbumArtists(List.of(artist));
-        return metadata;
+        StoredFileMetadata meta = sf.getMetadata();
+        if (meta == null) {
+            meta = new StoredFileMetadata();
+            sf.setMetadata(meta);
+        }
+
+        meta.setTitle(dto.getTitle());
+        meta.setAlbumCoverUrl(dto.getAlbumCoverUrl());
+        meta.setGenres(dto.getGenres());
+        meta.setYear(dto.getYear());
+        meta.setDuration(dto.getDuration() != 0 ? dto.getDuration() : null);
+
+        if (dto.getAlbum() != null && !dto.getAlbum().isBlank()) {
+            Album album = albumRepository.findByNameAndUserId(dto.getAlbum(), userId)
+                    .orElseGet(() -> {
+                        Album a = new Album();
+                        a.setName(dto.getAlbum());
+                        a.setUser(userRef);
+                        return albumRepository.save(a);
+                    });
+            meta.setAlbum(album);
+        }
+
+        if (dto.getArtistName() != null && !dto.getArtistName().isBlank()) {
+            Artist artist = artistRepository.findByNameAndUserIdOrderByNameAsc(dto.getArtistName(), userId)
+                    .orElseGet(() -> {
+                        Artist a = new Artist(dto.getArtistName(), userRef);
+                        return artistRepository.save(a);
+                    });
+            List<Artist> artists = new ArrayList<>();
+            artists.add(artist);
+            meta.setArtists(artists);
+        }
     }
 
     @Transactional
@@ -148,9 +162,9 @@ public abstract class ExternalMediaStorageService {
                         getProvider(),
                         entry.getExternalId(),
                         entry.getExternalId(),
-                        entry.getMetadataJson() != null ? entry.getMetadataJson().getPreviewUrl() : null,
+                        entry.getMetadata() != null ? entry.getPreviewUrl() : null,
                         entry.getLastModified(),
-                        entry.getMetadataJson()
+                        entry.getMetadata() != null ? toAudioFileMetadataDto(entry) : null
                 ))
                 .sorted(Comparator.comparing(FileDto::name, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
@@ -161,7 +175,6 @@ public abstract class ExternalMediaStorageService {
     @Transactional
     protected FolderContentsDto enrichWithCachedMetadata(String folderId, FolderContentsDto contents) {
         UUID userId = securityUtils.getCurrentUserId();
-
         var storedFolder = folderRepository.findByOwnerIdAndProviderAndExternalId(userId, getProvider(), folderId);
         if (storedFolder.isEmpty()) {
             return contents;
@@ -173,18 +186,17 @@ public abstract class ExternalMediaStorageService {
         List<FileDto> enriched = contents.files().stream()
                 .map(fileDto -> {
                     StoredFile local = localFilesById.get(fileDto.id());
-                    if (local == null || local.getMetadataJson() == null) {
+                    if (local == null || local.getMetadata() == null) {
                         return fileDto;
                     }
-                    AudioFileMetadata metadata = local.getMetadataJson();
                     return new FileDto(
                             fileDto.name(),
                             fileDto.provider(),
                             fileDto.path(),
                             fileDto.id(),
-                            metadata.getPreviewUrl(),
+                            local.getPreviewUrl(),
                             fileDto.lastModified(),
-                            metadata
+                            toAudioFileMetadataDto(local)
                     );
                 })
                 .collect(Collectors.toList());
@@ -192,12 +204,11 @@ public abstract class ExternalMediaStorageService {
         return new FolderContentsDto(contents.folders(), enriched);
     }
 
-    protected boolean isPreviewUrlExpired(AudioFileMetadata metadata) {
-        if (metadata == null || metadata.getPreviewUrl() == null || metadata.getLastModified() == null) {
+    protected boolean isPreviewUrlExpired(StoredFile sf) {
+        if (sf.getPreviewUrl() == null) {
             return true;
         }
-
-        Duration age = Duration.between(metadata.getLastModified().toInstant(), OffsetDateTime.now(ZoneOffset.UTC));
+        Duration age = Duration.between(sf.getLastModified().toInstant(), OffsetDateTime.now(ZoneOffset.UTC));
         return age.compareTo(PREVIEW_URL_EXPIRE_DURATION) > 0;
     }
 
@@ -286,7 +297,7 @@ public abstract class ExternalMediaStorageService {
                 file.setLastModified(fileDto.lastModified() != null ? fileDto.lastModified() : OffsetDateTime.now(ZoneOffset.UTC));
                 file.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
                 file.setType(FileType.AUDIO);
-                file.setMetadataJson(fileDto.metadata()); // null on first pass, populated after getOrUpdateAudioMetadata
+                // metadata is null on first pass; populated after getOrUpdateAudioMetadata
                 parentFolder.getFiles().add(file);
             }
         }
@@ -294,20 +305,18 @@ public abstract class ExternalMediaStorageService {
         folderRepository.save(parentFolder);
     }
 
-    protected AudioFileMetadataDto toAudioFileMetadataDto(AudioFileMetadata metadata) {
-        String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(
-                metadata.getAlbumCoverUrl(),
-                Duration.ofDays(7)
-        );
-
+    protected AudioFileMetadataDto toAudioFileMetadataDto(StoredFile sf) {
+        StoredFileMetadata meta = sf.getMetadata();
+        if (meta == null) return null;
+        String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(meta.getAlbumCoverUrl(), Duration.ofDays(7));
         return new AudioFileMetadataDto(
-                metadata.getTitle(),
-                metadata.getAlbumArtists().stream().map(Artist::getName).toList(),
-                metadata.getAlbum(),
-                metadata.getGenres(),
+                meta.getTitle(),
+                meta.getArtists().stream().map(Artist::getName).toList(),
+                meta.getAlbum() != null ? meta.getAlbum().getName() : null,
+                meta.getGenres(),
                 albumCoverUrl,
-                metadata.getDuration(),
-                metadata.getPreviewUrl()
+                meta.getDuration(),
+                sf.getPreviewUrl()
         );
     }
 

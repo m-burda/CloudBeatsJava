@@ -17,7 +17,7 @@ public class StoredFolder {
     private Provider provider;
 
     @Id
-    @Column(name = "external_id")
+    @Column(name = "external_id", length = 1024)
     private String externalId;
 
     @ManyToOne(fetch = FetchType.LAZY)
