@@ -20,7 +20,7 @@ public class StoredFileMetadata {
     @Column
     private String title;
 
-    @Column(name = "album_cover_url")
+    @Column(name = "album_cover_url", length=1024)
     private String albumCoverUrl;
 
     @Column
