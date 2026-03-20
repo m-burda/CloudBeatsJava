@@ -102,7 +102,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             folderData.getEntries().forEach(entry -> {
                 if (entry instanceof FolderMetadata folder) {
                     folders.add(new FolderDto(folder.getName(), getProvider(), folder.getPathLower(), folder.getId()));
-                } else if (entry instanceof FileMetadata file) {
+                } else if (entry instanceof FileMetadata file && isAudioFile(file)) {
                     files.add(toFileDto(file));
                 }
             });
@@ -115,6 +115,12 @@ public class DropboxStorageService extends ExternalMediaStorageService {
         } catch (DbxException e) {
             throw new IllegalArgumentException("Failed to list Dropbox files: " + e.getMessage());
         }
+    }
+
+    private boolean isAudioFile(FileMetadata file) {
+        String name = file.getName().toLowerCase();
+        List<String> audioExtensions = List.of(".mp3", ".wav", ".flac", ".m4a", ".ogg");
+        return audioExtensions.stream().anyMatch(name::endsWith);
     }
 
     private FileDto toFileDto(FileMetadata file) {
