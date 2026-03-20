@@ -49,13 +49,11 @@ public class SongService {
 
     public SongDto toSongDto(StoredFile file) {
         StoredFileMetadata meta = file.getMetadata();
-        if (meta != null && meta.getAlbumCoverUrl() != null) {
-            meta.setAlbumCoverUrl(
-                    fileManagementService.generateAccessUrlIfExpired(meta.getAlbumCoverUrl(), Duration.ofDays(7)));
-        }
         String previewUrl = meta == null ? null : file.getPreviewUrl();
         List<String> artists = meta == null ? null :
                 meta.getArtists().stream().map(Artist::getName).toList();
+        String albumCoverUrl = meta == null ? null :
+                fileManagementService.generateAccessUrlIfExpired(meta.getAlbumCoverUrl(), Duration.ofDays(7));
         return new SongDto(
                 file.getName(),
                 artists,
@@ -65,7 +63,7 @@ public class SongService {
                 file.getExternalId(),
                 file.getExternalId(),
                 previewUrl,
-                meta != null ? meta.getAlbumCoverUrl() : null,
+                albumCoverUrl,
                 file.getLastModified()
         );
     }

@@ -55,6 +55,8 @@ public class MinIOFileManagementService implements FileManagementService {
             return null;
         }
 
+        // TODO check for expiration
+
         try {
             int validitySeconds = (int) Math.min(duration.toSeconds(), 604800);
             return client.getPresignedObjectUrl(
