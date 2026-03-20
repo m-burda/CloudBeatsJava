@@ -9,9 +9,9 @@ public class AudioMetadataExtractionDto {
     private String albumCoverUrl;
     private List<String> genres;
     private Integer year;
-    private double duration;
+    private Integer duration;
 
-    public AudioMetadataExtractionDto(String title, String artistName, String album, String albumCoverUrl, List<String> genres, Integer year, double duration) {
+    public AudioMetadataExtractionDto(String title, String artistName, String album, String albumCoverUrl, List<String> genres, Integer year, Integer duration) {
         this.title = title;
         this.artistName = artistName;
         this.album = album;
@@ -69,11 +69,11 @@ public class AudioMetadataExtractionDto {
         this.year = year;
     }
 
-    public double getDuration() {
+    public Integer getDuration() {
         return duration;
     }
 
-    public void setDuration(double duration) {
+    public void setDuration(Integer duration) {
         this.duration = duration;
     }
 }

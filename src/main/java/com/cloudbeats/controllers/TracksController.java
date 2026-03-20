@@ -1,6 +1,6 @@
 package com.cloudbeats.controllers;
 
-import com.cloudbeats.dto.Song;
+import com.cloudbeats.dto.SongDto;
 import com.cloudbeats.services.SongService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,18 +19,18 @@ public class TracksController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Song>> getAllSongs(
+    public ResponseEntity<List<SongDto>> getAllSongs(
             @AuthenticationPrincipal UserDetails principal
     ) {
-        List<Song> songs = songService.getAllSongs();
+        List<SongDto> songs = songService.getAllSongs();
         return ResponseEntity.ok(songs);
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Song>> searchSongs(
+    public ResponseEntity<List<SongDto>> searchSongs(
             @RequestParam String q
     ) {
-        List<Song> songs = songService.searchSongs(q);
+        List<SongDto> songs = songService.searchSongs(q);
         return ResponseEntity.ok(songs);
     }
 }

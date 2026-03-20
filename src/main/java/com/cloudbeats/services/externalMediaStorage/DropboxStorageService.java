@@ -3,9 +3,10 @@ package com.cloudbeats.services.externalMediaStorage;
 import com.cloudbeats.config.DropboxClientProperties;
 import com.cloudbeats.db.entities.StoredFolder;
 import com.cloudbeats.dto.AudioFileMetadataDto;
+import com.cloudbeats.dto.FileDto;
 import com.cloudbeats.dto.FolderContentsDto;
 import com.cloudbeats.dto.FolderDto;
-import com.cloudbeats.dto.Song;
+import com.cloudbeats.services.SongService;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.*;
@@ -31,6 +32,7 @@ import java.util.*;
 public class DropboxStorageService extends ExternalMediaStorageService {
     private final DropboxClientProperties clientProperties;
     private final AudioProcessingService audioProcessingService;
+    private final SongService songService;
 
     public DropboxStorageService(
             ApplicationUserRepository userRepository,
@@ -41,7 +43,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             ArtistRepository artistRepository,
             FileManagementService fileManagementService,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            SecurityUtils securityUtils
+            SecurityUtils securityUtils, SongService songService
     ) {
         super(
                 userRepository,
@@ -50,17 +52,16 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 artistRepository,
                 fileManagementService,
                 authorizedClientManager,
-                securityUtils
+                securityUtils,
+                songService
         );
         this.clientProperties = clientProperties;
         this.audioProcessingService = audioProcessingService;
+        this.songService = songService;
     }
 
     @Transactional
     private DbxClientV2 getDbxClient() {
-//        var account = mediaStorageAccountRepository.findByUserIdAndProvider(userId, getProvider())
-//                .orElseThrow(() -> new IllegalStateException("No Dropbox account found for user: " + userId));
-
         var config = new DbxRequestConfig(clientProperties.getClientId());
         var authClient = getAuthorizedClient();
         var credential = new DbxCredential(
@@ -87,31 +88,26 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             }
         }
 
-        DbxClientV2 client = getDbxClient();
-
         StoredFolder parentFolder = getOrCreateFolder(securityUtils.getCurrentUserId(), folderId);
-
         try {
+            DbxClientV2 client = getDbxClient();
             ListFolderResult folderData = client.files()
                     .listFolderBuilder(parentFolder.getPath() == null ? "" : parentFolder.getPath())
                     .withIncludeMediaInfo(true)
                     .start();
 
             List<FolderDto> folders = new ArrayList<>();
-            List<Song> songs = new ArrayList<>();
+            List<FileDto> files = new ArrayList<>();
 
             folderData.getEntries().forEach(entry -> {
                 if (entry instanceof FolderMetadata folder) {
                     folders.add(new FolderDto(folder.getName(), getProvider(), folder.getPathLower(), folder.getId()));
                 } else if (entry instanceof FileMetadata file) {
-                    OffsetDateTime serverModified = file.getServerModified() != null
-                            ? file.getServerModified().toInstant().atOffset(ZoneOffset.UTC)
-                            : null;
-                    songs.add(new Song(file.getName(), List.of(), getProvider(), file.getPathLower(), file.getId(), file.getPreviewUrl(), null, serverModified, null));
+                    files.add(toFileDto(file));
                 }
             });
 
-            FolderContentsDto contents = new FolderContentsDto(folders, songs);
+            FolderContentsDto contents = new FolderContentsDto(folders, files);
             updateFolderContents(folderId, contents);
 
             return enrichWithCachedMetadata(folderId, contents);
@@ -119,6 +115,21 @@ public class DropboxStorageService extends ExternalMediaStorageService {
         } catch (DbxException e) {
             throw new IllegalArgumentException("Failed to list Dropbox files: " + e.getMessage());
         }
+    }
+
+    private FileDto toFileDto(FileMetadata file) {
+        OffsetDateTime serverModified = file.getServerModified() != null
+                ? file.getServerModified().toInstant().atOffset(ZoneOffset.UTC)
+                : null;
+        return new FileDto(
+                file.getName(),
+                getProvider(),
+                file.getPathLower(),
+                file.getId(),
+                file.getPreviewUrl(),
+                serverModified,
+                null
+        );
     }
 
     @Override
@@ -142,8 +153,6 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             if (tempFile.renameTo(renamedFile)) {
                 tempFile = renamedFile;
             }
-
-            UUID userId = securityUtils.getCurrentUserId();
 
             var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
             var metadata = convertMetadata(extractedDto);

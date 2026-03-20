@@ -1,11 +1,10 @@
 package com.cloudbeats.services;
 
 import com.cloudbeats.db.entities.ApplicationUser;
-import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.Playlist;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.dto.PlaylistDto;
-import com.cloudbeats.dto.Song;
+import com.cloudbeats.dto.SongDto;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.FileRepository;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,17 +22,20 @@ public class PlaylistService {
 
     private final PlaylistRepository playlistRepository;
     private final FileRepository fileRepository;
-    private final FileManagementService fileManagementService;
+    private final SongService songService;
     private final SecurityUtils securityUtils;
     private final ApplicationUserService applicationUserService;
 
-    public PlaylistService(PlaylistRepository playlistRepository,
-                           FileRepository fileRepository,
-                           FileManagementService fileManagementService,
-                           SecurityUtils securityUtils, ApplicationUserService applicationUserService) {
+    public PlaylistService(
+            PlaylistRepository playlistRepository,
+            FileRepository fileRepository,
+            SongService songService,
+            SecurityUtils securityUtils,
+            ApplicationUserService applicationUserService
+    ) {
         this.playlistRepository = playlistRepository;
         this.fileRepository = fileRepository;
-        this.fileManagementService = fileManagementService;
+        this.songService = songService;
         this.securityUtils = securityUtils;
         this.applicationUserService = applicationUserService;
     }
@@ -42,7 +43,7 @@ public class PlaylistService {
     public List<PlaylistDto> getAllPlaylists() {
         UUID ownerId = securityUtils.getCurrentUserId();
         return playlistRepository.findByOwnerId(ownerId).stream()
-                .map(this::toDto)
+                .map(this::toPlaylistDto)
                 .toList();
     }
 
@@ -50,7 +51,7 @@ public class PlaylistService {
         UUID ownerId = securityUtils.getCurrentUserId();
         Playlist playlist = playlistRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found"));
-        return toDto(playlist);
+        return toPlaylistDto(playlist);
     }
 
     @Transactional
@@ -59,7 +60,7 @@ public class PlaylistService {
         playlist.setName(name);
         ApplicationUser owner = applicationUserService.findApplicationUserById(securityUtils.getCurrentUserId());
         playlist.setOwner(owner);
-        return toDto(playlistRepository.save(playlist));
+        return toPlaylistDto(playlistRepository.save(playlist));
     }
 
     @Transactional
@@ -68,7 +69,7 @@ public class PlaylistService {
         Playlist playlist = playlistRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Playlist not found"));
         playlist.setName(name);
-        return toDto(playlistRepository.save(playlist));
+        return toPlaylistDto(playlistRepository.save(playlist));
     }
 
     @Transactional
@@ -92,7 +93,7 @@ public class PlaylistService {
             playlist.getSongs().add(file);
             playlistRepository.save(playlist);
         }
-        return toDto(playlist);
+        return toPlaylistDto(playlist);
     }
 
     @Transactional
@@ -104,37 +105,13 @@ public class PlaylistService {
         playlist.getSongs().removeIf(f ->
                 f.getProvider() == provider && f.getExternalId().equals(externalId));
         playlistRepository.save(playlist);
-        return toDto(playlist);
+        return toPlaylistDto(playlist);
     }
 
-    private PlaylistDto toDto(Playlist playlist) {
-        List<Song> songs = playlist.getSongs().stream()
-                .map(this::toSongDto)
+    private PlaylistDto toPlaylistDto(Playlist playlist) {
+        List<SongDto> songs = playlist.getSongs().stream()
+                .map(songService::toSongDto)
                 .toList();
         return new PlaylistDto(playlist.getId(), playlist.getName(), songs);
-    }
-
-    private Song toSongDto(StoredFile file) {
-        var metadata = file.getMetadataJson();
-        if (metadata != null && metadata.getAlbumCoverUrl() != null) {
-            metadata.setAlbumCoverUrl(
-                    fileManagementService.generateAccessUrlIfExpired(metadata.getAlbumCoverUrl(), Duration.ofDays(7)));
-        }
-        String previewUrl = metadata == null ? null : metadata.getPreviewUrl();
-        List<String> artists = metadata == null ? null :
-                metadata.getAlbumArtists().stream()
-                        .map(Artist::getName)
-                        .toList();
-        return new Song(
-                file.getName(),
-                artists,
-                file.getProvider(),
-                file.getExternalId(),
-                file.getExternalId(),
-                previewUrl,
-                metadata == null ? null : metadata.getAlbumCoverUrl(),
-                file.getLastModified(),
-                metadata
-        );
     }
 }

@@ -4,11 +4,9 @@ import com.azure.core.credential.AccessToken;
 import com.azure.core.credential.TokenCredential;
 import com.cloudbeats.config.OneDriveClientProperties;
 import com.cloudbeats.db.entities.MediaStorageAccount;
-import com.cloudbeats.dto.AudioFileMetadataDto;
-import com.cloudbeats.dto.FolderContentsDto;
-import com.cloudbeats.dto.FolderDto;
-import com.cloudbeats.dto.Song;
+import com.cloudbeats.dto.*;
 import com.cloudbeats.repositories.*;
+import com.cloudbeats.services.SongService;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.services.AudioProcessingService;
@@ -25,7 +23,6 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
@@ -47,7 +44,8 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             ArtistRepository artistRepository,
             FileManagementService fileManagementService,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            SecurityUtils securityUtils
+            SecurityUtils securityUtils,
+            SongService songService
     ) {
         super(
                 userRepository,
@@ -56,7 +54,8 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 artistRepository,
                 fileManagementService,
                 authorizedClientManager,
-                securityUtils
+                securityUtils,
+                songService
         );
         this.mediaStorageAccountRepository = mediaStorageAccountRepository;
         this.audioProcessingService = audioProcessingService;
@@ -130,35 +129,40 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 : List.of();
 
         List<FolderDto> folders = new ArrayList<>();
-        List<Song> songs = new ArrayList<>();
+        List<FileDto> files = new ArrayList<>();
 
         // Filter directly by mimeType because dogwater OneDrive won't return metadata
         items.stream()
                 .filter(item ->
                         item.getName() != null
                                 && (item.getFolder() != null
-                                || (item.getFile() != null
-                                && Objects.equals(item.getFile().getMimeType(), "audio/mpeg")
+                                || (item.getFile() != null && Objects.equals(item.getFile().getMimeType(), "audio/mpeg")
                         ))
                 )
                 .forEach(item -> {
+                    String parentPath = (item.getParentReference() != null && item.getParentReference().getPath() != null)
+                            ? item.getParentReference().getPath()
+                            : "";
+                    String cleanParent = parentPath.contains(":")
+                            ? parentPath.substring(parentPath.indexOf(':') + 1)
+                            : parentPath;
                     if (item.getFolder() != null) {
-                        String parentPath = (item.getParentReference() != null && item.getParentReference().getPath() != null)
-                                ? item.getParentReference().getPath()
-                                : "";
-                        // parentReference.path looks like "/drives/<driveId>/root:/Music" — strip the drive prefix
-                        String cleanParent = parentPath.contains(":")
-                                ? parentPath.substring(parentPath.indexOf(':') + 1)
-                                : parentPath;
                         String folderPath = cleanParent.isEmpty() ? "/" + item.getName() : cleanParent + "/" + item.getName();
                         folders.add(new FolderDto(item.getName(), getProvider(), folderPath, item.getId()));
                     } else {
-                        OffsetDateTime lastModified = item.getLastModifiedDateTime();
-                        songs.add(new Song(item.getName(), List.of(), getProvider(), item.getId(), item.getId(), null, null, lastModified, null));
+                        files.add(new FileDto(
+                                item.getName(),
+                                getProvider(),
+                                cleanParent,
+                                item.getId(),
+                                null,
+                                item.getLastModifiedDateTime(),
+                                null
+                        ));
                     }
                 });
 
-        FolderContentsDto contents = new FolderContentsDto(folders, songs);
+        FolderContentsDto contents = new FolderContentsDto(folders, files);
         updateFolderContents(folderId, contents);
 
         return enrichWithCachedMetadata(folderId, contents);
@@ -167,7 +171,6 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
     @Override
     public AudioFileMetadataDto getOrUpdateAudioMetadata(String fileId) {
         try {
-            UUID userId = securityUtils.getCurrentUserId();
             Optional<AudioFileMetadataDto> optionalCachedMetadata = getMetadataFromCache(fileId);
             if (optionalCachedMetadata.isPresent()) {
                 return optionalCachedMetadata.get();

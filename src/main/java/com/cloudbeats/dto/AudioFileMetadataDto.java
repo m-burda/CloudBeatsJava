@@ -8,7 +8,7 @@ public record AudioFileMetadataDto(
         String album,
         List<String> genres,
         String albumCoverUrl,
-        Double duration,
+        Integer duration,
         String previewUrl
 ){
 }

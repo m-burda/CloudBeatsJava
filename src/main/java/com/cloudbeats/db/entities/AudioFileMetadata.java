@@ -19,7 +19,7 @@ public class AudioFileMetadata extends FileMetadata {
     @Transient
     private List<AudioCodec> audioCodecs;
 
-    private double duration;
+    private Integer duration;
 
     public String getTitle() {
         return title;
@@ -30,7 +30,7 @@ public class AudioFileMetadata extends FileMetadata {
     }
 
     public List<Artist> getAlbumArtists() {
-        return albumArtists;
+        return albumArtists != null ? albumArtists : List.of();
     }
 
     public void setAlbumArtists(List<Artist> albumArtists) {
@@ -77,11 +77,11 @@ public class AudioFileMetadata extends FileMetadata {
         this.audioCodecs = audioCodecs;
     }
 
-    public double getDuration() {
+    public Integer getDuration() {
         return duration;
     }
 
-    public void setDuration(double duration) {
+    public void setDuration(Integer duration) {
         this.duration = duration;
     }
 }
