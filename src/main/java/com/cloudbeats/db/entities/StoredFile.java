@@ -3,8 +3,7 @@ package com.cloudbeats.db.entities;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.Provider;
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+
 import java.time.OffsetDateTime;
 
 @Entity
@@ -17,7 +16,7 @@ public class StoredFile {
     private Provider provider;
 
     @Id
-    @Column(name = "external_id")
+    @Column(name = "external_id", length = 1024)
     private String externalId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -29,6 +28,10 @@ public class StoredFile {
 
     @Column(name = "preview_url")
     private String previewUrl;
+
+    @OneToOne(cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
+    @JoinColumn(name = "metadata_id", referencedColumnName = "id")
+    private StoredFileMetadata metadata;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -43,13 +46,8 @@ public class StoredFile {
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
-    public void setMetadataJson(AudioFileMetadata metadataJson) {
-        this.metadataJson = metadataJson;
-    }
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "metadata_json", columnDefinition = "jsonb")
-    private AudioFileMetadata metadataJson;
+    @Column(name = "search_text", insertable = false, updatable = false)
+    private String searchText;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
@@ -58,64 +56,54 @@ public class StoredFile {
     })
     private StoredFolder folder;
 
-    public AudioFileMetadata getMetadataJson() {
-        return metadataJson;
+
+    public String getExternalId() {
+        return externalId;
     }
 
     public void setExternalId(String externalId) {
         this.externalId = externalId;
     }
 
+    public Provider getProvider() {
+        return provider;
+    }
+
     public void setProvider(Provider provider) {
         this.provider = provider;
     }
 
-    public void setOwner(ApplicationUser owner) {
-        this.owner = owner;
+    public ApplicationUser getOwner() {
+        return owner;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setFolder(StoredFolder folder) {
-        this.folder = folder;
-    }
-
-    public void setLastModified(OffsetDateTime lastModified) {
-        this.lastModified = lastModified;
-    }
-
-    public void setLastSynced(OffsetDateTime lastSynced) {
-        this.lastSynced = lastSynced;
-    }
-
-    public OffsetDateTime getLastModified() {
-        return lastModified;
-    }
-
-    public OffsetDateTime getLastSynced() {
-        return lastSynced;
-    }
-
-    public StoredFolder getFolder() {
-        return folder;
-    }
-
-    public String getExternalId() {
-        return externalId;
+    public void setOwner(ApplicationUser o) {
+        this.owner = o;
     }
 
     public String getName() {
         return name;
     }
 
-    public Provider getProvider() {
-        return provider;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public ApplicationUser getOwner() {
-        return owner;
+    public String getPreviewUrl() {
+        return previewUrl;
+    }
+
+    public void setPreviewUrl(String previewUrl) {
+        this.previewUrl = previewUrl;
+    }
+
+    public StoredFileMetadata getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(StoredFileMetadata metadata) {
+        this.metadata = metadata;
+        if (metadata != null) metadata.setFile(this);
     }
 
     public FileType getType() {
@@ -124,5 +112,33 @@ public class StoredFile {
 
     public void setType(FileType type) {
         this.type = type;
+    }
+
+    public OffsetDateTime getLastModified() {
+        return lastModified;
+    }
+
+    public void setLastModified(OffsetDateTime t) {
+        this.lastModified = t;
+    }
+
+    public OffsetDateTime getLastSynced() {
+        return lastSynced;
+    }
+
+    public void setLastSynced(OffsetDateTime t) {
+        this.lastSynced = t;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public StoredFolder getFolder() {
+        return folder;
+    }
+
+    public void setFolder(StoredFolder folder) {
+        this.folder = folder;
     }
 }

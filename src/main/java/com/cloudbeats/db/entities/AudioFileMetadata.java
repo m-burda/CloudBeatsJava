@@ -9,8 +9,6 @@ public class AudioFileMetadata extends FileMetadata {
     private String title;
     @ManyToMany
     private List<Artist> albumArtists;
-    @Deprecated
-    private String albumCoverUrl;
     private String album;
     @ElementCollection
     private List<String> genres;
@@ -35,14 +33,6 @@ public class AudioFileMetadata extends FileMetadata {
 
     public void setAlbumArtists(List<Artist> albumArtists) {
         this.albumArtists = albumArtists;
-    }
-
-    public String getAlbumCoverUrl() {
-        return albumCoverUrl;
-    }
-
-    public void setAlbumCoverUrl(String albumCoverUrl) {
-        this.albumCoverUrl = albumCoverUrl;
     }
 
     public String getAlbum() {

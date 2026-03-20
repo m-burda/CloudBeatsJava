@@ -28,9 +28,10 @@ public class TracksController {
 
     @GetMapping("/search")
     public ResponseEntity<List<SongDto>> searchSongs(
-            @RequestParam String q
+            @RequestParam(required = false, defaultValue = "") String q,
+            @RequestParam(required = false, defaultValue = "") String artist
     ) {
-        List<SongDto> songs = songService.searchSongs(q);
+        List<SongDto> songs = songService.searchSongs(q, artist);
         return ResponseEntity.ok(songs);
     }
 }
