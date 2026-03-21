@@ -1,6 +1,7 @@
 package com.cloudbeats.services;
 
 import com.cloudbeats.config.S3Config;
+import com.cloudbeats.models.Provider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -56,7 +57,11 @@ public class S3FileManagementService implements FileManagementService {
     }
 
     @Override
-    public String generateAccessUrlIfExpired(String internalUri, Duration duration) {
+    public String getOrSetAlbumCoverUrl(Provider provider, String internalUri, Duration duration) {
+        return "";
+    }
+
+    public String getFileAccessUrl(String internalUri, Duration duration) {
         if (internalUri == null || internalUri.isEmpty()) {
             return internalUri;
         }

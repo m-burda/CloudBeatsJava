@@ -26,9 +26,6 @@ public class StoredFile {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "preview_url")
-    private String previewUrl;
-
     @OneToOne(cascade = {CascadeType.ALL}, fetch = FetchType.LAZY)
     @JoinColumn(name = "metadata_id", referencedColumnName = "id")
     private StoredFileMetadata metadata;
@@ -56,7 +53,6 @@ public class StoredFile {
     })
     private StoredFolder folder;
 
-
     public String getExternalId() {
         return externalId;
     }
@@ -73,10 +69,6 @@ public class StoredFile {
         this.provider = provider;
     }
 
-    public ApplicationUser getOwner() {
-        return owner;
-    }
-
     public void setOwner(ApplicationUser o) {
         this.owner = o;
     }
@@ -89,14 +81,6 @@ public class StoredFile {
         this.name = name;
     }
 
-    public String getPreviewUrl() {
-        return previewUrl;
-    }
-
-    public void setPreviewUrl(String previewUrl) {
-        this.previewUrl = previewUrl;
-    }
-
     public StoredFileMetadata getMetadata() {
         return metadata;
     }
@@ -104,10 +88,6 @@ public class StoredFile {
     public void setMetadata(StoredFileMetadata metadata) {
         this.metadata = metadata;
         if (metadata != null) metadata.setFile(this);
-    }
-
-    public FileType getType() {
-        return type;
     }
 
     public void setType(FileType type) {
@@ -122,20 +102,8 @@ public class StoredFile {
         this.lastModified = t;
     }
 
-    public OffsetDateTime getLastSynced() {
-        return lastSynced;
-    }
-
     public void setLastSynced(OffsetDateTime t) {
         this.lastSynced = t;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public StoredFolder getFolder() {
-        return folder;
     }
 
     public void setFolder(StoredFolder folder) {

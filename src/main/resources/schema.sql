@@ -2,18 +2,19 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE TABLE IF NOT EXISTS oauth2_authorized_client (
-  client_registration_id varchar(100) NOT NULL,
-  principal_name varchar(200) NOT NULL,
-  access_token_type varchar(100) NOT NULL,
-  access_token_value bytea NOT NULL,
-  access_token_issued_at timestamp NOT NULL,
-  access_token_expires_at timestamp NOT NULL,
-  access_token_scopes varchar(1000) DEFAULT NULL,
-  refresh_token_value bytea DEFAULT NULL,
-  refresh_token_issued_at timestamp DEFAULT NULL,
-  created_at timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  PRIMARY KEY (client_registration_id, principal_name)
+CREATE TABLE IF NOT EXISTS public.oauth2_authorized_client
+(
+    client_registration_id character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    principal_name character varying(200) COLLATE pg_catalog."default" NOT NULL,
+    access_token_type character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    access_token_value bytea NOT NULL,
+    access_token_issued_at timestamp without time zone NOT NULL,
+    access_token_expires_at timestamp without time zone NOT NULL,
+    access_token_scopes character varying(1000) COLLATE pg_catalog."default" DEFAULT NULL::character varying,
+    refresh_token_value bytea,
+    refresh_token_issued_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT oauth2_authorized_client_pkey PRIMARY KEY (client_registration_id, principal_name)
 );
 
 -- Per-user albums (replaces the old bigint 'album' table)
@@ -55,21 +56,6 @@ CREATE TABLE IF NOT EXISTS public.media_storage_account
     token_issued_utc timestamp(6) without time zone,
     user_id uuid NOT NULL,
     CONSTRAINT media_storage_account_pkey PRIMARY KEY (id)
-);
-
-CREATE TABLE IF NOT EXISTS public.oauth2_authorized_client
-(
-    client_registration_id character varying(100) COLLATE pg_catalog."default" NOT NULL,
-    principal_name character varying(200) COLLATE pg_catalog."default" NOT NULL,
-    access_token_type character varying(100) COLLATE pg_catalog."default" NOT NULL,
-    access_token_value bytea NOT NULL,
-    access_token_issued_at timestamp without time zone NOT NULL,
-    access_token_expires_at timestamp without time zone NOT NULL,
-    access_token_scopes character varying(1000) COLLATE pg_catalog."default" DEFAULT NULL::character varying,
-    refresh_token_value bytea,
-    refresh_token_issued_at timestamp without time zone,
-    created_at timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT oauth2_authorized_client_pkey PRIMARY KEY (client_registration_id, principal_name)
 );
 
 CREATE TABLE IF NOT EXISTS public.playlist_songs

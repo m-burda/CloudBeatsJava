@@ -1,6 +1,8 @@
 package com.cloudbeats.services;
 
 import com.cloudbeats.config.MinIOConfig;
+import com.cloudbeats.models.Provider;
+import com.cloudbeats.utils.SecurityUtils;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
@@ -19,13 +21,18 @@ import java.time.Duration;
 public class MinIOFileManagementService implements FileManagementService {
     private final MinioClient client;
     private final String bucketName;
+    private final InMemoryCacheService cacheService;
+    private final SecurityUtils securityUtils;
 
     public MinIOFileManagementService(
-        MinIOConfig config,
-        MinioClient client
+            MinIOConfig config,
+            MinioClient client,
+            InMemoryCacheService cacheService, SecurityUtils securityUtils
     ) {
         this.client = client;
         this.bucketName = config.getBucketName();
+        this.cacheService = cacheService;
+        this.securityUtils = securityUtils;
     }
 
     @Override
@@ -50,23 +57,27 @@ public class MinIOFileManagementService implements FileManagementService {
     }
 
     @Override
-    public String generateAccessUrlIfExpired(String internalUri, Duration duration) {
+    public String getOrSetAlbumCoverUrl(Provider provider, String internalUri, Duration expiresIn) {
         if (internalUri == null) {
             return null;
         }
 
-        // TODO check for expiration
+        String cached = cacheService.getPreviewUrl(provider, internalUri);
+        if (cached != null) {
+            return cached;
+        }
 
         try {
-            int validitySeconds = (int) Math.min(duration.toSeconds(), 604800);
-            return client.getPresignedObjectUrl(
+            String url = client.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(bucketName)
                             .object(internalUri)
-                            .expiry(validitySeconds)
+                            .expiry((int) expiresIn.toSeconds())
                             .build()
             );
+            cacheService.setPreviewUrl(provider, internalUri, url, expiresIn);
+            return url;
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate presigned URL from MinIO", e);
         }

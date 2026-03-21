@@ -1,12 +1,9 @@
 package com.cloudbeats.services.externalMediaStorage;
 
 import com.cloudbeats.db.entities.*;
-import com.cloudbeats.dto.AudioMetadataExtractionDto;
-import com.cloudbeats.dto.AudioFileMetadataDto;
-import com.cloudbeats.dto.FileDto;
-import com.cloudbeats.dto.FolderContentsDto;
-import com.cloudbeats.dto.FolderDto;
+import com.cloudbeats.dto.*;
 import com.cloudbeats.repositories.*;
+import com.cloudbeats.services.InMemoryCacheService;
 import com.cloudbeats.services.SongService;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.FileType;
@@ -33,6 +30,7 @@ public abstract class ExternalMediaStorageService {
     protected final ArtistRepository artistRepository;
     protected final AlbumRepository albumRepository;
     protected final FileManagementService fileManagementService;
+    protected final InMemoryCacheService cacheService;
     protected static final Duration PREVIEW_URL_EXPIRE_DURATION = Duration.ofMinutes(10);
     protected final OAuth2AuthorizedClientManager authorizedClientManager;
     protected final SecurityUtils securityUtils;
@@ -45,6 +43,7 @@ public abstract class ExternalMediaStorageService {
             ArtistRepository artistRepository,
             AlbumRepository albumRepository,
             FileManagementService fileManagementService,
+            InMemoryCacheService cacheService,
             OAuth2AuthorizedClientManager authorizedClientManager,
             SecurityUtils securityUtils,
             SongService songService
@@ -55,6 +54,7 @@ public abstract class ExternalMediaStorageService {
         this.artistRepository = artistRepository;
         this.albumRepository = albumRepository;
         this.fileManagementService = fileManagementService;
+        this.cacheService = cacheService;
         this.authorizedClientManager = authorizedClientManager;
         this.securityUtils = securityUtils;
         this.songService = songService;
@@ -72,40 +72,39 @@ public abstract class ExternalMediaStorageService {
     public abstract Provider getProvider();
 
     public abstract FolderContentsDto listFiles(String folderId, boolean cached);
+    protected abstract PreviewUrlResult fetchFilePreviewUrl(String fileId);
+    public abstract void updateAudioMetadata(String fileId);
+    public abstract SongDto getOrUpdateMetadata(String fileId);
 
-    public abstract AudioFileMetadataDto getOrUpdateAudioMetadata(String fileId);
+    protected String getOrFetchPreviewUrl(String fileId) {
+        String cached = cacheService.getPreviewUrl(getProvider(), fileId);
+        if (cached != null) {
+            return cached;
+        }
+        PreviewUrlResult preview = fetchFilePreviewUrl(fileId);
+        cacheService.setPreviewUrl(getProvider(), fileId, preview.url(), preview.expiresIn());
+        return preview.url();
+    }
 
-    protected abstract String getFilePreviewUrl(String fileId);
-
-    protected Optional<AudioFileMetadataDto> getMetadataFromCache(String fileId) {
+    protected Optional<SongDto> getMetadataFromCache(String fileId) {
         UUID userId = securityUtils.getCurrentUserId();
         Optional<StoredFile> cachedFile = fileRepository.findByOwnerIdAndExternalId(userId, fileId);
-
         if (cachedFile.isPresent() && cachedFile.get().getMetadata() != null) {
-            StoredFile sf = cachedFile.get();
-            AudioFileMetadataDto dto = toAudioFileMetadataDto(sf);
-
-            if (isPreviewUrlExpired(sf)) {
-                String previewUrl = getFilePreviewUrl(fileId);
-                sf.setPreviewUrl(previewUrl);
-                fileRepository.save(sf);
-            }
-
-            return Optional.of(dto);
+            return Optional.of(toSongDtoWithPreview(cachedFile.get()));
         }
         return Optional.empty();
     }
 
     @Transactional
-    public void updateFileMetadata(String fileId, AudioMetadataExtractionDto dto) {
+    public void updateMetadata(String fileId, AudioMetadataExtractionDto dto) {
         UUID userId = securityUtils.getCurrentUserId();
         StoredFile sf = fileRepository.findByOwnerIdAndExternalId(userId, fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
-        applyMetadataToFile(sf, dto, userId);
-         fileRepository.save(sf);
+        addOrUpdateMetadata(sf, dto, userId);
+        fileRepository.save(sf);
     }
 
-    private void applyMetadataToFile(StoredFile sf, AudioMetadataExtractionDto dto, UUID userId) {
+    private void addOrUpdateMetadata(StoredFile sf, AudioMetadataExtractionDto dto, UUID userId) {
         ApplicationUser userRef = userRepository.getReferenceById(userId);
 
         StoredFileMetadata meta = sf.getMetadata();
@@ -115,7 +114,7 @@ public abstract class ExternalMediaStorageService {
         }
 
         meta.setTitle(dto.getTitle());
-        meta.setAlbumCoverUrl(dto.getAlbumCoverUrl());
+        meta.setAlbumCoverInternalUri(dto.getAlbumCoverUrl());
         meta.setGenres(dto.getGenres());
         meta.setYear(dto.getYear());
         meta.setDuration(dto.getDuration() != 0 ? dto.getDuration() : null);
@@ -156,17 +155,9 @@ public abstract class ExternalMediaStorageService {
                 .sorted(Comparator.comparing(FolderDto::name))
                 .collect(Collectors.toList());
 
-        List<FileDto> files = folder.get().getFiles().stream()
-                .map(entry -> new FileDto(
-                        entry.getName(),
-                        getProvider(),
-                        entry.getExternalId(),
-                        entry.getExternalId(),
-                        entry.getMetadata() != null ? entry.getPreviewUrl() : null,
-                        entry.getLastModified(),
-                        entry.getMetadata() != null ? toAudioFileMetadataDto(entry) : null
-                ))
-                .sorted(Comparator.comparing(FileDto::name, Comparator.nullsLast(Comparator.naturalOrder())))
+        List<SongDto> files = folder.get().getFiles().stream()
+                .map(this::toSongDto)
+                .sorted(Comparator.comparing(SongDto::title, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
 
         return Optional.of(new FolderContentsDto(folders, files));
@@ -183,33 +174,17 @@ public abstract class ExternalMediaStorageService {
         Map<String, StoredFile> localFilesById = storedFolder.get().getFiles().stream()
                 .collect(Collectors.toMap(StoredFile::getExternalId, f -> f));
 
-        List<FileDto> enriched = contents.files().stream()
-                .map(fileDto -> {
-                    StoredFile local = localFilesById.get(fileDto.id());
+        List<SongDto> enriched = contents.files().stream()
+                .map(song -> {
+                    StoredFile local = localFilesById.get(song.id());
                     if (local == null || local.getMetadata() == null) {
-                        return fileDto;
+                        return song;
                     }
-                    return new FileDto(
-                            fileDto.name(),
-                            fileDto.provider(),
-                            fileDto.path(),
-                            fileDto.id(),
-                            local.getPreviewUrl(),
-                            fileDto.lastModified(),
-                            toAudioFileMetadataDto(local)
-                    );
+                    return toSongDto(local);
                 })
                 .collect(Collectors.toList());
 
         return new FolderContentsDto(contents.folders(), enriched);
-    }
-
-    protected boolean isPreviewUrlExpired(StoredFile sf) {
-        if (sf.getPreviewUrl() == null) {
-            return true;
-        }
-        Duration age = Duration.between(sf.getLastModified().toInstant(), OffsetDateTime.now(ZoneOffset.UTC));
-        return age.compareTo(PREVIEW_URL_EXPIRE_DURATION) > 0;
     }
 
     protected String getExtensionFromMime(File file) {
@@ -279,44 +254,81 @@ public abstract class ExternalMediaStorageService {
         }
 
         Set<String> remoteFileIds = contents.files().stream()
-                .map(FileDto::id)
+                .map(SongDto::id)
                 .collect(Collectors.toSet());
         parentFolder.getFiles().removeIf(f -> !remoteFileIds.contains(f.getExternalId()));
 
         Set<String> localFileIds = parentFolder.getFiles().stream()
                 .map(StoredFile::getExternalId)
                 .collect(Collectors.toSet());
-        for (FileDto fileDto : contents.files()) {
-            if (!localFileIds.contains(fileDto.id())) {
-                var file = new StoredFile();
-                file.setExternalId(fileDto.id());
-                file.setProvider(getProvider());
-                file.setOwner(currentUser);
-                file.setName(fileDto.name() != null ? fileDto.name() : fileDto.id());
-                file.setFolder(parentFolder);
-                file.setLastModified(fileDto.lastModified() != null ? fileDto.lastModified() : OffsetDateTime.now(ZoneOffset.UTC));
-                file.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
-                file.setType(FileType.AUDIO);
-                // metadata is null on first pass; populated after getOrUpdateAudioMetadata
-                parentFolder.getFiles().add(file);
+        for (SongDto dto : contents.files()) {
+            if (!localFileIds.contains(dto.id())) {
+                var sf = new StoredFile();
+                sf.setExternalId(dto.id());
+                sf.setProvider(getProvider());
+                sf.setOwner(currentUser);
+                sf.setName(dto.title() != null ? dto.title() : dto.id());
+                sf.setFolder(parentFolder);
+                sf.setLastModified(dto.lastModified() != null ? dto.lastModified() : OffsetDateTime.now(ZoneOffset.UTC));
+                sf.setLastSynced(OffsetDateTime.now(ZoneOffset.UTC));
+                sf.setType(FileType.AUDIO);
+                parentFolder.getFiles().add(sf);
             }
         }
 
         folderRepository.save(parentFolder);
     }
 
-    protected AudioFileMetadataDto toAudioFileMetadataDto(StoredFile sf) {
-        StoredFileMetadata meta = sf.getMetadata();
-        if (meta == null) return null;
-        String albumCoverUrl = fileManagementService.generateAccessUrlIfExpired(meta.getAlbumCoverUrl(), Duration.ofDays(7));
-        return new AudioFileMetadataDto(
-                meta.getTitle(),
-                meta.getArtists().stream().map(Artist::getName).toList(),
-                meta.getAlbum() != null ? meta.getAlbum().getName() : null,
-                meta.getGenres(),
+    /**
+     * Converts a StoredFile to a SongDto with a resolved albumCoverUrl.
+     * Includes a previewUrl only if one is already cached — does NOT fetch a new one.
+     * Use for listFiles.
+     */
+    protected SongDto toSongDto(StoredFile file) {
+        StoredFileMetadata meta = file.getMetadata();
+        String albumCoverUrl = (meta != null && meta.getAlbumCoverInternalUri() != null)
+                ? fileManagementService.getOrSetAlbumCoverUrl(file.getProvider(), meta.getAlbumCoverInternalUri(), Duration.ofDays(7))
+                : null;
+        List<String> artists = (meta != null && meta.getArtists() != null)
+                ? meta.getArtists().stream().map(Artist::getName).toList()
+                : List.of();
+        String title = (meta != null && meta.getTitle() != null) ? meta.getTitle() : file.getName();
+        String album = (meta != null && meta.getAlbum() != null) ? meta.getAlbum().getName() : null;
+        Integer duration = meta != null ? meta.getDuration() : null;
+        String previewUrl = cacheService.getPreviewUrl(getProvider(), file.getExternalId());
+
+        return new SongDto(
+                title,
+                artists,
+                album,
+                duration,
+                file.getProvider(),
+                file.getExternalId(),
+                file.getExternalId(),
+                previewUrl,
                 albumCoverUrl,
-                meta.getDuration(),
-                sf.getPreviewUrl()
+                file.getLastModified()
+        );
+    }
+
+    /**
+     * Converts a StoredFile to a SongDto with both a resolved albumCoverUrl and a fetched/cached previewUrl.
+     * Use for getFileMetadata.
+     */
+    protected SongDto toSongDtoWithPreview(StoredFile file) {
+        SongDto base = toSongDto(file);
+        String previewUrl = getOrFetchPreviewUrl(file.getExternalId());
+        return new SongDto(
+                base.title(),
+                base.albumArtists(),
+                base.album(),
+                base.duration(),
+                base.provider(),
+                base.path(),
+                base.id(),
+                previewUrl,
+                base.albumCoverUrl(),
+                base.lastModified()
         );
     }
 

@@ -1,5 +1,6 @@
 package com.cloudbeats.services;
 
+import com.cloudbeats.models.Provider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +38,7 @@ public class LocalFileManagementService implements FileManagementService {
     }
 
     @Override
-    public String generateAccessUrlIfExpired(String internalUri, Duration duration) {
+    public String getOrSetAlbumCoverUrl(Provider provider, String internalUri, Duration duration) {
         return internalUri;
     }
 }

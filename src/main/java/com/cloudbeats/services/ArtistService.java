@@ -16,14 +16,12 @@ public class ArtistService {
 
     private final ArtistRepository artistRepository;
     private final FileRepository fileRepository;
-    private final ApplicationUserService applicationUserService;
     private final FileManagementService fileManagementService;
     private final SecurityUtils securityUtils;
 
-    public ArtistService(ArtistRepository artistRepository, FileRepository fileRepository, ApplicationUserService applicationUserService, FileManagementService fileManagementService, SecurityUtils securityUtils) {
+    public ArtistService(ArtistRepository artistRepository, FileRepository fileRepository, FileManagementService fileManagementService, SecurityUtils securityUtils) {
         this.artistRepository = artistRepository;
         this.fileRepository = fileRepository;
-        this.applicationUserService = applicationUserService;
         this.fileManagementService = fileManagementService;
         this.securityUtils = securityUtils;
     }
@@ -39,8 +37,9 @@ public class ArtistService {
                                     && file.getMetadata().getArtists().stream()
                                     .anyMatch(a -> a.getName().equals(artist.getName())))
                             .findFirst()
-                            .map(file -> fileManagementService.generateAccessUrlIfExpired(
-                                    file.getMetadata().getAlbumCoverUrl(),
+                            .map(file -> fileManagementService.getOrSetAlbumCoverUrl(
+                                    file.getProvider(),
+                                    file.getMetadata().getAlbumCoverInternalUri(),
                                     Duration.ofDays(7)
                             ))
                             .orElse(null);

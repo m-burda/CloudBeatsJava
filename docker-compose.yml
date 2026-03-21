@@ -19,6 +19,19 @@ services:
     networks:
       - cloudbeats-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: cloudbeats-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloudbeats-network
+
   minio:
     image: minio/minio:latest
     container_name: cloudbeats-minio
@@ -69,6 +82,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
     networks:

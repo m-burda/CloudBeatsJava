@@ -4,5 +4,5 @@ import java.util.List;
 
 public record FolderContentsDto(
         List<FolderDto> folders,
-        List<FileDto> files
+        List<SongDto> files
 ) {}

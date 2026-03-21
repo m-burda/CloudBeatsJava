@@ -21,7 +21,7 @@ public class StoredFileMetadata {
     private String title;
 
     @Column(name = "album_cover_url", length=1024)
-    private String albumCoverUrl;
+    private String albumCoverUrlInternal;
 
     @Column
     private Integer duration;
@@ -66,12 +66,12 @@ public class StoredFileMetadata {
         this.title = title;
     }
 
-    public String getAlbumCoverUrl() {
-        return albumCoverUrl;
+    public String getAlbumCoverInternalUri() {
+        return albumCoverUrlInternal;
     }
 
-    public void setAlbumCoverUrl(String url) {
-        this.albumCoverUrl = url;
+    public void setAlbumCoverInternalUri(String url) {
+        this.albumCoverUrlInternal = url;
     }
 
     public Integer getDuration() {

@@ -5,16 +5,13 @@ import com.cloudbeats.models.Provider;
 import java.time.OffsetDateTime;
 import java.util.List;
 
-public record SongDto(
+public record SongShortDto(
         String title,
         List<String> albumArtists,
         String album,
         Integer duration,
         Provider provider,
-        String path,
         String id,
-        String previewUrl,
         String albumCoverUrl,
         OffsetDateTime lastModified
-) {}
-
+){}

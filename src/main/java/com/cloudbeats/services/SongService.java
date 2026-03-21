@@ -3,9 +3,9 @@ package com.cloudbeats.services;
 import com.cloudbeats.db.entities.Artist;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.db.entities.StoredFileMetadata;
-import com.cloudbeats.dto.AudioFileMetadataDto;
 import com.cloudbeats.dto.FileDto;
 import com.cloudbeats.dto.SongDto;
+import com.cloudbeats.models.Provider;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.repositories.FileRepository;
 import org.springframework.stereotype.Service;
@@ -49,37 +49,35 @@ public class SongService {
 
     public SongDto toSongDto(StoredFile file) {
         StoredFileMetadata meta = file.getMetadata();
-        String previewUrl = meta == null ? null : file.getPreviewUrl();
+        String albumCoverUrl = meta == null ? null :
+                fileManagementService.getOrSetAlbumCoverUrl(file.getProvider(), meta.getAlbumCoverInternalUri(), Duration.ofDays(7));
         List<String> artists = meta == null ? null :
                 meta.getArtists().stream().map(Artist::getName).toList();
-        String albumCoverUrl = meta == null ? null :
-                fileManagementService.generateAccessUrlIfExpired(meta.getAlbumCoverUrl(), Duration.ofDays(7));
         return new SongDto(
-                file.getName(),
+                meta != null && meta.getTitle() != null ? meta.getTitle() : file.getName(),
                 artists,
                 meta != null && meta.getAlbum() != null ? meta.getAlbum().getName() : null,
                 meta != null ? meta.getDuration() : null,
                 file.getProvider(),
                 file.getExternalId(),
                 file.getExternalId(),
-                previewUrl,
+                null,
                 albumCoverUrl,
                 file.getLastModified()
         );
     }
 
     public SongDto toSongDto(FileDto fileDto) {
-        AudioFileMetadataDto meta = fileDto.metadata();
         return new SongDto(
-                fileDto.name(),
-                meta != null ? meta.albumArtists() : null,
-                meta != null ? meta.album() : null,
-                meta != null ? meta.duration() : null,
+                fileDto.title() != null ? fileDto.title() : fileDto.name(),
+                fileDto.artists(),
+                fileDto.album(),
+                fileDto.duration(),
                 fileDto.provider(),
-                fileDto.path(),
                 fileDto.id(),
-                meta != null ? fileDto.previewUrl() : null,
-                meta != null ? meta.albumCoverUrl() : null,
+                fileDto.id(),
+                fileDto.previewUrl(),
+                null,
                 fileDto.lastModified()
         );
     }

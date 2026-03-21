@@ -1,6 +1,6 @@
 package com.cloudbeats.models;
 
-import com.cloudbeats.db.entities.AudioFileMetadata;
+import com.cloudbeats.db.entities.StoredFileMetadata;
 
 import java.util.List;
 
@@ -11,7 +11,7 @@ public record FolderEntry (
     Provider provider,
     String path,
     String id,
-    AudioFileMetadata metadata,
+    StoredFileMetadata metadata,
     List<FolderEntry> folders,
     List<FolderEntry> files
 ){}
