@@ -1,6 +1,7 @@
 package com.cloudbeats.db.entities;
 
 import jakarta.persistence.*;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -15,7 +16,7 @@ public class ApplicationUser implements UserDetails {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private String username;
+    private String email;
     private String password;
 
     public UUID getId() {
@@ -26,12 +27,13 @@ public class ApplicationUser implements UserDetails {
         this.id = id;
     }
 
+    @NotNull
     public String getUsername() {
-        return username;
+        return email;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     @Override

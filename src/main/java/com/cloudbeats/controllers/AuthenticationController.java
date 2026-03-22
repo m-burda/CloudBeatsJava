@@ -2,13 +2,15 @@ package com.cloudbeats.controllers;
 
 import com.cloudbeats.db.entities.ApplicationUser;
 import com.cloudbeats.repositories.ApplicationUserRepository;
-import com.cloudbeats.services.AuthenticationService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,16 +47,17 @@ public class AuthenticationController {
     }
 
     public static class AuthenticationRequestBody {
-        private String userName;
-        private String password;
+        @NotBlank(message = "Email is required")
+        @Email(message = "Please provide a valid email address")
         private String email;
+        private String password;
 
-        public String getUserName() {
-            return userName;
+        public String getEmail() {
+            return email;
         }
 
-        public void setUserName(String userName) {
-            this.userName = userName;
+        public void setEmail(String email) {
+            this.email = email;
         }
 
         public String getPassword() {
@@ -64,20 +67,16 @@ public class AuthenticationController {
         public void setPassword(String password) {
             this.password = password;
         }
-
-        public String getEmail() {
-            return email;
-        }
-
-        public void setEmail(String email) {
-            this.email = email;
-        }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+    public ResponseEntity<String> login(
+            @Valid
+            @RequestBody LoginRequest request,
+            HttpServletRequest servletRequest
+    ) {
         Authentication auth = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username, request.password)
+                new UsernamePasswordAuthenticationToken(request.email, request.password)
         );
 
         SecurityContext sc = SecurityContextHolder.getContext();
@@ -89,29 +88,46 @@ public class AuthenticationController {
         return ResponseEntity.ok("Login successful");
     }
 
-    private record LoginRequest(@NotNull String username, @NotNull String password) {}
+    private record LoginRequest(
+        @NotBlank(message = "Email is required")
+        @Email(message = "Please provide a valid email address")
+        String email,
+        String password
+    ) {}
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
-        if (userRepository.existsByUsername(request.username)) {
+    public ResponseEntity<String> register(
+            @Valid
+            @RequestBody RegisterRequest request
+    ) {
+        if (userRepository.existsByUsername(request.email)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("User already exists");
         }
 
         ApplicationUser user = new ApplicationUser();
-        user.setUsername(request.username);
+        user.setEmail(request.email);
         user.setPassword(passwordEncoder.encode(request.password));
         userRepository.save(user);
 
         return ResponseEntity.ok("User registered");
     }
 
-    private record RegisterRequest(String username, String password) {}
+    private record RegisterRequest(
+            @NotBlank(message = "Email is required")
+            @Email(message = "Please provide a valid email address")
+            String email,
+            @Size(min = 12, max = 20, message = "Password must be between 12 and 20 characters")
+            String password
+    ) {}
 
     @PostMapping("/authenticate")
-    public ResponseEntity<String> authenticate(@RequestBody AuthenticationRequestBody requestBody) {
+    public ResponseEntity<String> authenticate(
+            @Valid
+            @RequestBody AuthenticationRequestBody requestBody
+    ) {
         try {
             Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(requestBody.getUserName(), requestBody.getPassword())
+                new UsernamePasswordAuthenticationToken(requestBody.getEmail(), requestBody.getPassword())
             );
 
             User user = (User) authentication.getPrincipal();
