@@ -5,7 +5,6 @@ import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.db.entities.StoredFolder;
 import com.cloudbeats.dto.*;
 import com.cloudbeats.services.InMemoryCacheService;
-import com.cloudbeats.services.SongService;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.*;
@@ -33,7 +32,6 @@ import java.util.*;
 public class DropboxStorageService extends ExternalMediaStorageService {
     private final DropboxClientProperties clientProperties;
     private final AudioProcessingService audioProcessingService;
-    private final SongService songService;
 
     public DropboxStorageService(
             ApplicationUserRepository userRepository,
@@ -46,8 +44,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             FileManagementService fileManagementService,
             InMemoryCacheService cacheService,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            SecurityUtils securityUtils,
-            SongService songService
+            SecurityUtils securityUtils
     ) {
         super(
                 userRepository,
@@ -58,12 +55,10 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 fileManagementService,
                 cacheService,
                 authorizedClientManager,
-                securityUtils,
-                songService
+                securityUtils
         );
         this.clientProperties = clientProperties;
         this.audioProcessingService = audioProcessingService;
-        this.songService = songService;
     }
 
     @Transactional

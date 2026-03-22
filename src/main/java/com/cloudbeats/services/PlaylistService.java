@@ -5,6 +5,7 @@ import com.cloudbeats.db.entities.Playlist;
 import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.dto.PlaylistDto;
 import com.cloudbeats.dto.SongDto;
+import com.cloudbeats.factories.ExternalMediaStorageServiceFactory;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.repositories.FileRepository;
@@ -22,20 +23,19 @@ public class PlaylistService {
 
     private final PlaylistRepository playlistRepository;
     private final FileRepository fileRepository;
-    private final SongService songService;
     private final SecurityUtils securityUtils;
     private final ApplicationUserService applicationUserService;
+    private final ExternalMediaStorageServiceFactory externalMediaStorageServiceFactory;
 
     public PlaylistService(
             PlaylistRepository playlistRepository,
             FileRepository fileRepository,
-            SongService songService,
             SecurityUtils securityUtils,
-            ApplicationUserService applicationUserService
+            ApplicationUserService applicationUserService, ExternalMediaStorageServiceFactory externalMediaStorageServiceFactory
     ) {
         this.playlistRepository = playlistRepository;
         this.fileRepository = fileRepository;
-        this.songService = songService;
+        this.externalMediaStorageServiceFactory = externalMediaStorageServiceFactory;
         this.securityUtils = securityUtils;
         this.applicationUserService = applicationUserService;
     }
@@ -110,7 +110,10 @@ public class PlaylistService {
 
     private PlaylistDto toPlaylistDto(Playlist playlist) {
         List<SongDto> songs = playlist.getSongs().stream()
-                .map(songService::toSongDto)
+                .map(file -> {
+                    var storageService = externalMediaStorageServiceFactory.getService(file.getProvider());
+                    return storageService.toSongDto(file);
+                })
                 .toList();
         return new PlaylistDto(playlist.getId(), playlist.getName(), songs);
     }

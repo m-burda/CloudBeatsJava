@@ -8,7 +8,6 @@ import com.cloudbeats.db.entities.StoredFile;
 import com.cloudbeats.dto.*;
 import com.cloudbeats.repositories.*;
 import com.cloudbeats.services.InMemoryCacheService;
-import com.cloudbeats.services.SongService;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.services.AudioProcessingService;
@@ -50,8 +49,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
             InMemoryCacheService cacheService,
             OAuth2AuthorizedClientManager authorizedClientManager,
             SecurityUtils securityUtils,
-            AlbumRepository albumRepository,
-            SongService songService
+            AlbumRepository albumRepository
     ) {
         super(
                 userRepository,
@@ -62,8 +60,7 @@ public class OneDriveStorageService extends ExternalMediaStorageService {
                 fileManagementService,
                 cacheService,
                 authorizedClientManager,
-                securityUtils,
-                songService
+                securityUtils
         );
         this.mediaStorageAccountRepository = mediaStorageAccountRepository;
         this.audioProcessingService = audioProcessingService;

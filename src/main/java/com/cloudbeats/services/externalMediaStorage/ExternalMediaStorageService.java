@@ -4,7 +4,6 @@ import com.cloudbeats.db.entities.*;
 import com.cloudbeats.dto.*;
 import com.cloudbeats.repositories.*;
 import com.cloudbeats.services.InMemoryCacheService;
-import com.cloudbeats.services.SongService;
 import com.cloudbeats.utils.SecurityUtils;
 import com.cloudbeats.models.FileType;
 import com.cloudbeats.models.Provider;
@@ -34,7 +33,6 @@ public abstract class ExternalMediaStorageService {
     protected static final Duration PREVIEW_URL_EXPIRE_DURATION = Duration.ofMinutes(10);
     protected final OAuth2AuthorizedClientManager authorizedClientManager;
     protected final SecurityUtils securityUtils;
-    protected final SongService songService;
 
     protected ExternalMediaStorageService(
             ApplicationUserRepository userRepository,
@@ -45,8 +43,7 @@ public abstract class ExternalMediaStorageService {
             FileManagementService fileManagementService,
             InMemoryCacheService cacheService,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            SecurityUtils securityUtils,
-            SongService songService
+            SecurityUtils securityUtils
     ) {
         this.userRepository = userRepository;
         this.folderRepository = folderRepository;
@@ -57,7 +54,6 @@ public abstract class ExternalMediaStorageService {
         this.cacheService = cacheService;
         this.authorizedClientManager = authorizedClientManager;
         this.securityUtils = securityUtils;
-        this.songService = songService;
     }
 
     public OAuth2AuthorizedClient getAuthorizedClient() {
@@ -284,7 +280,7 @@ public abstract class ExternalMediaStorageService {
      * Includes a previewUrl only if one is already cached — does NOT fetch a new one.
      * Use for listFiles.
      */
-    protected SongDto toSongDto(StoredFile file) {
+    public SongDto toSongDto(StoredFile file) {
         StoredFileMetadata meta = file.getMetadata();
         String albumCoverUrl = (meta != null && meta.getAlbumCoverInternalUri() != null)
                 ? fileManagementService.getOrSetAlbumCoverUrl(file.getProvider(), meta.getAlbumCoverInternalUri(), Duration.ofDays(7))
