@@ -2,7 +2,6 @@ package com.cloudbeats.services;
 
 import com.cloudbeats.db.entities.ApplicationUser;
 import com.cloudbeats.repositories.ApplicationUserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
