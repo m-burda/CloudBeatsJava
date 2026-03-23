@@ -11,10 +11,8 @@ public record SongDto(
         String album,
         Integer duration,
         Provider provider,
-        String path,
         String id,
         String previewUrl,
         String albumCoverUrl,
         OffsetDateTime lastModified
 ) {}
-

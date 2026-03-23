@@ -109,4 +109,8 @@ public class StoredFile {
     public void setFolder(StoredFolder folder) {
         this.folder = folder;
     }
+
+    public ApplicationUser getOwner() {
+        return owner;
+    }
 }

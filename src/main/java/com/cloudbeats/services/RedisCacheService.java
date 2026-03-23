@@ -22,24 +22,24 @@ public class RedisCacheService implements InMemoryCacheService{
     }
 
     @Override
-    public String getPreviewUrlKey(Provider provider, String key) {
+    public String getPreviewUrlKey(String userId, Provider provider, String key) {
         return String.join(
                 ":",
-                securityUtils.getCurrentUserId().toString(),
+                userId,
                 provider.toString(),
                 key
         );
     }
 
     @Override
-    public String getPreviewUrl(Provider provider, String key) {
-        String cacheKey = getPreviewUrlKey(provider, key);
+    public String getPreviewUrl(String userId, Provider provider, String key) {
+        String cacheKey = getPreviewUrlKey(userId, provider, key);
         return redisTemplate.opsForValue().get(cacheKey);
     }
 
     @Override
-    public void setPreviewUrl(Provider provider, String key, String previewUrl, Duration expiresIn) {
-        String cacheKey = getPreviewUrlKey(provider, key);
+    public void setPreviewUrl(String userId, Provider provider, String key, String previewUrl, Duration expiresIn) {
+        String cacheKey = getPreviewUrlKey(userId, provider, key);
         redisTemplate.opsForValue().set(cacheKey, previewUrl, expiresIn.getSeconds(), TimeUnit.SECONDS);
     }
 }

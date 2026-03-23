@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 
 @Service
 public class LocalAudioProcessingService implements AudioProcessingService {
@@ -41,7 +42,7 @@ public class LocalAudioProcessingService implements AudioProcessingService {
             if (tag == null) {
                 return new AudioMetadataExtractionDto(
                         originalFileName,
-                        "Unknown Artist",
+                        List.of("Unknown Artist"),
                         "Unknown",
                         null,
                         null,
@@ -52,7 +53,7 @@ public class LocalAudioProcessingService implements AudioProcessingService {
 
             String title = tag.getFirst(FieldKey.TITLE);
             String album = tag.getFirst(FieldKey.ALBUM);
-            String artistName = tag.getFirst(FieldKey.ARTIST);
+            List<String> artistName = tag.getAll(FieldKey.ARTIST);
             Integer year = null;
             try {
                 String yearStr = tag.getFirst(FieldKey.YEAR);
@@ -71,7 +72,7 @@ public class LocalAudioProcessingService implements AudioProcessingService {
 
             return new AudioMetadataExtractionDto(
                     title,
-                    artistName != null && !artistName.isEmpty() ? artistName : "Unknown Artist",
+                    artistName != null && !artistName.isEmpty() ? artistName : List.of("Unknown Artist"),
                     album,
                     albumCoverUrl,
                     null,

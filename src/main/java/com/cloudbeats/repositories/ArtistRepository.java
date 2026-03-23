@@ -12,5 +12,6 @@ import java.util.UUID;
 public interface ArtistRepository extends CrudRepository<Artist, String> {
         List<Artist> findByUserId(UUID userId);
         Optional<Artist> findByNameAndUserIdOrderByNameAsc(String name, UUID userId);
+        List<Artist> findAllByNameInAndUserId(List<String> name, UUID userId);
 }
 

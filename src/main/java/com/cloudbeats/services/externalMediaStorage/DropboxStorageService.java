@@ -18,6 +18,11 @@ import com.dropbox.core.v2.files.FileMetadata;
 import com.dropbox.core.v2.files.FolderMetadata;
 import com.dropbox.core.v2.files.ListFolderResult;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.stereotype.Service;
 
@@ -26,12 +31,17 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.Executor;
 
 
 @Service
 public class DropboxStorageService extends ExternalMediaStorageService {
+    private static final Logger log = LoggerFactory.getLogger(DropboxStorageService.class);
     private final DropboxClientProperties clientProperties;
     private final AudioProcessingService audioProcessingService;
+    @Autowired
+    @Lazy
+    private DropboxStorageService self;
 
     public DropboxStorageService(
             ApplicationUserRepository userRepository,
@@ -44,7 +54,8 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             FileManagementService fileManagementService,
             InMemoryCacheService cacheService,
             OAuth2AuthorizedClientManager authorizedClientManager,
-            SecurityUtils securityUtils
+            SecurityUtils securityUtils,
+            Executor taskExecutor
     ) {
         super(
                 userRepository,
@@ -55,13 +66,13 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 fileManagementService,
                 cacheService,
                 authorizedClientManager,
-                securityUtils
+                securityUtils,
+                taskExecutor
         );
         this.clientProperties = clientProperties;
         this.audioProcessingService = audioProcessingService;
     }
 
-    @Transactional
     private DbxClientV2 getDbxClient() {
         var config = new DbxRequestConfig(clientProperties.getClientId());
         var authClient = getAuthorizedClient();
@@ -111,7 +122,7 @@ public class DropboxStorageService extends ExternalMediaStorageService {
             FolderContentsDto contents = new FolderContentsDto(folders, files);
             updateFolderContents(folderId, contents);
 
-            return enrichWithCachedMetadata(folderId, contents);
+            return enrichFolderContentsWithCachedMetadata(folderId, contents);
 
         } catch (DbxException e) {
             throw new IllegalArgumentException("Failed to list Dropbox files: " + e.getMessage());
@@ -124,7 +135,6 @@ public class DropboxStorageService extends ExternalMediaStorageService {
         return audioExtensions.stream().anyMatch(name::endsWith);
     }
 
-    /** Builds a bare SongDto from Dropbox provider metadata (no album cover, no preview). */
     private SongDto toProviderSongDto(FileMetadata file) {
         OffsetDateTime serverModified = file.getServerModified() != null
                 ? file.getServerModified().toInstant().atOffset(ZoneOffset.UTC)
@@ -136,7 +146,6 @@ public class DropboxStorageService extends ExternalMediaStorageService {
                 null,
                 getProvider(),
                 file.getId(),
-                file.getId(),
                 null,
                 null,
                 serverModified
@@ -144,58 +153,52 @@ public class DropboxStorageService extends ExternalMediaStorageService {
     }
 
     @Override
-    public SongDto getOrUpdateMetadata(String fileId) {
-        Optional<SongDto> optionalCachedMetadata = getMetadataFromCache(fileId);
-        if (optionalCachedMetadata.isPresent()) {
-            return optionalCachedMetadata.get();
+    public String getOrUpdateMetadata(String fileId) {
+        UUID userId = securityUtils.getCurrentUserId();
+        String previewUrl = getOrFetchPreviewUrl(fileId);
+
+        boolean hasMetadata = fileRepository.findByOwnerIdAndExternalId(userId, fileId)
+                .map(sf -> sf.getMetadata() != null)
+                .orElse(false);
+
+        if (!hasMetadata) {
+            self.extractAndStoreMetadataAsync(getDbxClient(), fileId, userId);
         }
 
-        DbxClientV2 client = getDbxClient();
-
-        try {
-            File tempFile = File.createTempFile("cloudbeats_", ".tmp");
-
-            try (OutputStream out = new FileOutputStream(tempFile)) {
-                client.files().download(fileId).download(out);
-            }
-
-            String extension = getExtensionFromMime(tempFile);
-            File renamedFile = new File(tempFile.getAbsolutePath() + extension);
-            if (tempFile.renameTo(renamedFile)) {
-                tempFile = renamedFile;
-            }
-
-            var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
-            updateMetadata(fileId, extractedDto);
-
-            StoredFile sf = fileRepository.findByOwnerIdAndExternalId(securityUtils.getCurrentUserId(), fileId)
-                    .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
-            return toSongDtoWithPreview(sf);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Metadata extraction failed", e);
-        }
+        return previewUrl;
     }
 
-    @Override
-    public void updateAudioMetadata(String fileId) {
-        DbxClientV2 client = getDbxClient();
+    @Async
+    @Transactional
+    public void extractAndStoreMetadataAsync(DbxClientV2 client, String fileId, UUID userId) {
+        var metadata = extractAudioMetadata(client, fileId);
+        updateMetadata(userId, fileId, metadata);
+        StoredFile sf = fileRepository.findByOwnerIdAndExternalId(userId, fileId)
+                .orElseThrow(() -> new IllegalArgumentException("File not found: " + fileId));
+        sendMetadataUpdate(toSongDto(sf), userId.toString());
+    }
+
+    private AudioMetadataExtractionDto extractAudioMetadata(DbxClientV2 client, String fileId){
         try {
             File tempFile = File.createTempFile("cloudbeats_", ".tmp");
             try (OutputStream out = new FileOutputStream(tempFile)) {
                 client.files().download(fileId).download(out);
+                String extension = getExtensionFromMime(tempFile);
+                File renamedFile = new File(tempFile.getAbsolutePath() + extension);
+                if (tempFile.renameTo(renamedFile)) {
+                    tempFile = renamedFile;
+                }
+                return audioProcessingService.extractAudioMetadata(fileId, tempFile);
             }
-            String extension = getExtensionFromMime(tempFile);
-            File renamedFile = new File(tempFile.getAbsolutePath() + extension);
-            if (tempFile.renameTo(renamedFile)) {
-                tempFile = renamedFile;
+            finally {
+                if (tempFile.exists()) {
+                    tempFile.delete();
+                }
             }
-            var extractedDto = audioProcessingService.extractAudioMetadata(fileId, tempFile);
-            updateMetadata(fileId, extractedDto);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Metadata extraction failed", e);
+        } catch (DbxException | IOException e) {
+            throw new RuntimeException(e);
         }
+
     }
 
     @Override

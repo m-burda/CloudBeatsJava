@@ -4,16 +4,16 @@ import java.util.List;
 
 public class AudioMetadataExtractionDto {
     private String title;
-    private String artistName;
+    private List<String> artists;
     private String album;
     private String albumCoverUrl;
     private List<String> genres;
     private Integer year;
     private Integer duration;
 
-    public AudioMetadataExtractionDto(String title, String artistName, String album, String albumCoverUrl, List<String> genres, Integer year, Integer duration) {
+    public AudioMetadataExtractionDto(String title, List<String> artists, String album, String albumCoverUrl, List<String> genres, Integer year, Integer duration) {
         this.title = title;
-        this.artistName = artistName;
+        this.artists = artists;
         this.album = album;
         this.albumCoverUrl = albumCoverUrl;
         this.genres = genres;
@@ -29,12 +29,12 @@ public class AudioMetadataExtractionDto {
         this.title = title;
     }
 
-    public String getArtistName() {
-        return artistName;
+    public List<String> getArtists() {
+        return artists;
     }
 
-    public void setArtistName(String artistName) {
-        this.artistName = artistName;
+    public void setArtists(List<String> artists) {
+        this.artists = artists;
     }
 
     public String getAlbum() {

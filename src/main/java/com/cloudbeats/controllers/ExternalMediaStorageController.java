@@ -1,7 +1,6 @@
 package com.cloudbeats.controllers;
 
 import com.cloudbeats.dto.FolderContentsDto;
-import com.cloudbeats.dto.SongDto;
 import com.cloudbeats.factories.ExternalMediaStorageServiceFactory;
 import com.cloudbeats.models.Provider;
 import com.cloudbeats.services.SongService;
@@ -32,14 +31,19 @@ public class ExternalMediaStorageController {
         return ResponseEntity.ok(contents);
     }
 
+    /**
+     * Immediately returns the previewUrl for the requested file.
+     * Full metadata (title, artists, album art, etc.) is extracted asynchronously
+     * and pushed to the client via SSE once ready.
+     */
     @GetMapping("/{provider}/files/{fileId}/metadata")
-    public ResponseEntity<SongDto> getFileMetadata(
+    public ResponseEntity<String> getFileMetadata(
             @PathVariable Provider provider,
             @PathVariable String fileId
     ) {
         ExternalMediaStorageService storageService = storageFactory.getService(provider);
-        SongDto metadata = storageService.getOrUpdateMetadata(fileId);
-        return ResponseEntity.ok(metadata);
+        String previewUrl = storageService.getOrUpdateMetadata(fileId);
+        return ResponseEntity.ok(previewUrl);
     }
 
     @DeleteMapping("/files")

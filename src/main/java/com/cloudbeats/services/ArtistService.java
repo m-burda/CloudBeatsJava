@@ -38,9 +38,9 @@ public class ArtistService {
                                     .anyMatch(a -> a.getName().equals(artist.getName())))
                             .findFirst()
                             .map(file -> fileManagementService.getOrSetAlbumCoverUrl(
+                                    userId.toString(),
                                     file.getProvider(),
-                                    file.getMetadata().getAlbumCoverInternalUri(),
-                                    Duration.ofDays(7)
+                                    file.getMetadata().getAlbumCoverInternalUri()
                             ))
                             .orElse(null);
 

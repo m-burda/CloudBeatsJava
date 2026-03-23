@@ -57,11 +57,11 @@ public class S3FileManagementService implements FileManagementService {
     }
 
     @Override
-    public String getOrSetAlbumCoverUrl(Provider provider, String internalUri, Duration duration) {
+    public String getOrSetAlbumCoverUrl(String userId, Provider provider, String internalUri) {
         return "";
     }
 
-    public String getFileAccessUrl(String internalUri, Duration duration) {
+    public String getFileAccessUrl(String internalUri) {
         if (internalUri == null || internalUri.isEmpty()) {
             return internalUri;
         }
@@ -88,7 +88,7 @@ public class S3FileManagementService implements FileManagementService {
                     .build();
 
             GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                    .signatureDuration(duration)
+                    .signatureDuration(Duration.ofDays(1))
                     .getObjectRequest(getObjectRequest)
                     .build();
 

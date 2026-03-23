@@ -13,12 +13,22 @@ public class SecurityUtils {
         return SecurityContextHolder.getContext().getAuthentication();
     }
 
-    public UUID getCurrentUserId() {
+    public ApplicationUser getCurrentUser() {
         Authentication auth = getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof ApplicationUser user)) {
             throw new IllegalStateException("No authenticated user found");
         }
+        return user;
+    };
+
+    public UUID getCurrentUserId() {
+        var user = getCurrentUser();
         return user.getId();
+    }
+
+    public String getCurrentUserEmail() {
+        var user = getCurrentUser();
+        return user.getUsername();
     }
 }
 

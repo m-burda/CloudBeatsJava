@@ -2,7 +2,6 @@ package com.cloudbeats.services;
 
 import com.cloudbeats.config.MinIOConfig;
 import com.cloudbeats.models.Provider;
-import com.cloudbeats.utils.SecurityUtils;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
-import java.time.Duration;
 
 @Service
 @Primary
@@ -22,17 +20,15 @@ public class MinIOFileManagementService implements FileManagementService {
     private final MinioClient client;
     private final String bucketName;
     private final InMemoryCacheService cacheService;
-    private final SecurityUtils securityUtils;
 
     public MinIOFileManagementService(
             MinIOConfig config,
             MinioClient client,
-            InMemoryCacheService cacheService, SecurityUtils securityUtils
+            InMemoryCacheService cacheService
     ) {
         this.client = client;
         this.bucketName = config.getBucketName();
         this.cacheService = cacheService;
-        this.securityUtils = securityUtils;
     }
 
     @Override
@@ -57,12 +53,12 @@ public class MinIOFileManagementService implements FileManagementService {
     }
 
     @Override
-    public String getOrSetAlbumCoverUrl(Provider provider, String internalUri, Duration expiresIn) {
+    public String getOrSetAlbumCoverUrl(String userId, Provider provider, String internalUri) {
         if (internalUri == null) {
             return null;
         }
 
-        String cached = cacheService.getPreviewUrl(provider, internalUri);
+        String cached = cacheService.getPreviewUrl(userId, provider, internalUri);
         if (cached != null) {
             return cached;
         }
@@ -73,10 +69,10 @@ public class MinIOFileManagementService implements FileManagementService {
                             .method(Method.GET)
                             .bucket(bucketName)
                             .object(internalUri)
-                            .expiry((int) expiresIn.toSeconds())
+                            .expiry((int) ALBUM_COVER_URL_EXPIRES_IN.toSeconds())
                             .build()
             );
-            cacheService.setPreviewUrl(provider, internalUri, url, expiresIn);
+            cacheService.setPreviewUrl(userId, provider, internalUri, url, ALBUM_COVER_URL_EXPIRES_IN);
             return url;
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate presigned URL from MinIO", e);
